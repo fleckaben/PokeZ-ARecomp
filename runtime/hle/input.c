@@ -265,6 +265,13 @@ static void recompute_pad(void) {
         rx = (int32_t)copysign(m * cos(a * M_PI / 180), rx);
         ry = (int32_t)copysign(m * sin(a * M_PI / 180), ry);
     }
+    // Inside the unit circle, as a Switch's own sticks always are (its HID clamps them): some pads' sticks reach past it
+    // on the diagonals - the AYN Odin 3's right stick read 108 % with full right and a little up - and Pokémon Z-A's
+    // camera, never given more than 100 %, went wild there. The direction is kept.
+    if (rx || ry) {
+        double m = sqrt((double)rx * rx + (double)ry * ry);
+        if (m > 32767.0) rx = (int32_t)lround(rx * 32767.0 / m), ry = (int32_t)lround(ry * 32767.0 / m);
+    }
     pad_rx = rx, pad_ry = ry;
 }
 
