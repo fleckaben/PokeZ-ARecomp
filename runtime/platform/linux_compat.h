@@ -5,6 +5,7 @@
 #include <string.h>
 #include <sys/random.h>
 
+#if defined(__GLIBC__)
 #if !__GLIBC_PREREQ(2, 38)
 static inline size_t strlcpy(char *d, const char *s, size_t n) {
     size_t len = strlen(s);
@@ -21,7 +22,9 @@ static inline size_t strlcat(char *d, const char *s, size_t n) {
     return dl + strlcpy(d + dl, s, n - dl);
 }
 #endif
+#endif
 
+#if defined(__GLIBC__)
 #if !__GLIBC_PREREQ(2, 36)
 static inline uint32_t arc4random(void) {
     uint32_t v = 0;
@@ -34,4 +37,5 @@ static inline uint32_t arc4random_uniform(uint32_t n) {
     do r = arc4random(); while (r < min);
     return r % n;
 }
+#endif
 #endif

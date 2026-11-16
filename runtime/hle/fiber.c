@@ -21,6 +21,41 @@
 #include <string.h>
 #ifdef _WIN32
 #include <windows.h>
+#elif defined(__ANDROID__)
+#include <signal.h>
+#include <sys/mman.h>
+// Android's libc has no getcontext / makecontext / swapcontext: the few this file uses, for arm64. A context is the
+// stack pointer of its saved frame (x19-x30, d8-d15: what a call may not clobber); a fresh one starts in co_thunk,
+// which calls the function kept in its x19.
+typedef struct {
+    void *sp;
+    stack_t uc_stack;
+    void *uc_link;
+} co_ctx;
+#define ucontext_t co_ctx
+void co_swap(void **save_sp, void *load_sp);
+void co_thunk(void);
+__asm__(".text\n.p2align 2\n.globl co_swap\n.hidden co_swap\nco_swap:\n"
+        "  sub sp, sp, #160\n"
+        "  stp x19, x20, [sp, #0]\n  stp x21, x22, [sp, #16]\n  stp x23, x24, [sp, #32]\n"
+        "  stp x25, x26, [sp, #48]\n  stp x27, x28, [sp, #64]\n  stp x29, x30, [sp, #80]\n"
+        "  stp d8, d9, [sp, #96]\n  stp d10, d11, [sp, #112]\n  stp d12, d13, [sp, #128]\n  stp d14, d15, [sp, #144]\n"
+        "  mov x2, sp\n  str x2, [x0]\n  mov sp, x1\n"
+        "  ldp x19, x20, [sp, #0]\n  ldp x21, x22, [sp, #16]\n  ldp x23, x24, [sp, #32]\n"
+        "  ldp x25, x26, [sp, #48]\n  ldp x27, x28, [sp, #64]\n  ldp x29, x30, [sp, #80]\n"
+        "  ldp d8, d9, [sp, #96]\n  ldp d10, d11, [sp, #112]\n  ldp d12, d13, [sp, #128]\n  ldp d14, d15, [sp, #144]\n"
+        "  add sp, sp, #160\n  ret\n"
+        ".globl co_thunk\n.hidden co_thunk\nco_thunk:\n  blr x19\n  brk #0\n");
+static int getcontext(ucontext_t *uc) { memset(uc, 0, sizeof *uc); return 0; }
+static void makecontext(ucontext_t *uc, void (*fn)(void), int argc) {
+    (void)argc;
+    uint64_t *f = (uint64_t *)(((uintptr_t)uc->uc_stack.ss_sp + uc->uc_stack.ss_size) & ~(uintptr_t)15) - 20;
+    memset(f, 0, 160);
+    f[0] = (uint64_t)(uintptr_t)fn;           // x19
+    f[11] = (uint64_t)(uintptr_t)co_thunk;    // x30
+    uc->sp = f;
+}
+static int swapcontext(ucontext_t *save, const ucontext_t *load) { co_swap(&save->sp, load->sp); return 0; }
 #else
 #include <sys/mman.h>
 #include <ucontext.h>

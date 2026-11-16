@@ -749,6 +749,78 @@ static void *pipeline_cache_saver(void *a) {  // every 3 minutes, when it grew
     return NULL;
 }
 
+
+#ifdef __ANDROID__
+// Android drivers (Adreno) lack some features the desktop drivers all have: every feature struct in the device's chain
+// is checked against the driver, and what it doesn't have is turned off (and logged) instead of failing the device
+// with VK_ERROR_FEATURE_NOT_PRESENT.
+static size_t vk_feature_size(VkStructureType s) {
+    switch (s) {
+#define FS(T, S) case T: return sizeof(S);
+    FS(VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2, VkPhysicalDeviceFeatures2)
+    FS(VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_1_FEATURES, VkPhysicalDeviceVulkan11Features)
+    FS(VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES, VkPhysicalDeviceVulkan12Features)
+    FS(VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_3_FEATURES, VkPhysicalDeviceVulkan13Features)
+    FS(VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FAULT_FEATURES_EXT, VkPhysicalDeviceFaultFeaturesEXT)
+    FS(VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_CUSTOM_BORDER_COLOR_FEATURES_EXT, VkPhysicalDeviceCustomBorderColorFeaturesEXT)
+    FS(VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VERTEX_ATTRIBUTE_DIVISOR_FEATURES_EXT, VkPhysicalDeviceVertexAttributeDivisorFeaturesEXT)
+    FS(VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ROBUSTNESS_2_FEATURES_EXT, VkPhysicalDeviceRobustness2FeaturesEXT)
+    FS(VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PRESENT_ID_FEATURES_KHR, VkPhysicalDevicePresentIdFeaturesKHR)
+    FS(VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PRESENT_WAIT_FEATURES_KHR, VkPhysicalDevicePresentWaitFeaturesKHR)
+    FS(VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_EXTENDED_DYNAMIC_STATE_FEATURES_EXT, VkPhysicalDeviceExtendedDynamicStateFeaturesEXT)
+    FS(VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_EXTENDED_DYNAMIC_STATE_2_FEATURES_EXT, VkPhysicalDeviceExtendedDynamicState2FeaturesEXT)
+    FS(VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SYNCHRONIZATION_2_FEATURES, VkPhysicalDeviceSynchronization2Features)
+    FS(VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DYNAMIC_RENDERING_FEATURES, VkPhysicalDeviceDynamicRenderingFeatures)
+    FS(VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VERTEX_INPUT_DYNAMIC_STATE_FEATURES_EXT, VkPhysicalDeviceVertexInputDynamicStateFeaturesEXT)
+    FS(VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_GRAPHICS_PIPELINE_LIBRARY_FEATURES_EXT, VkPhysicalDeviceGraphicsPipelineLibraryFeaturesEXT)
+    FS(VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_EXTENDED_DYNAMIC_STATE_3_FEATURES_EXT, VkPhysicalDeviceExtendedDynamicState3FeaturesEXT)
+    FS(VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_QUAD_CONTROL_FEATURES_KHR, VkPhysicalDeviceShaderQuadControlFeaturesKHR)
+    FS(VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_MAXIMAL_RECONVERGENCE_FEATURES_KHR, VkPhysicalDeviceShaderMaximalReconvergenceFeaturesKHR)
+    FS(VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_TRANSFORM_FEEDBACK_FEATURES_EXT, VkPhysicalDeviceTransformFeedbackFeaturesEXT)
+    FS(VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DEPTH_CLIP_ENABLE_FEATURES_EXT, VkPhysicalDeviceDepthClipEnableFeaturesEXT)
+    FS(VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DEPTH_CLIP_CONTROL_FEATURES_EXT, VkPhysicalDeviceDepthClipControlFeaturesEXT)
+    FS(VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROVOKING_VERTEX_FEATURES_EXT, VkPhysicalDeviceProvokingVertexFeaturesEXT)
+    FS(VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_INDEX_TYPE_UINT8_FEATURES_EXT, VkPhysicalDeviceIndexTypeUint8FeaturesEXT)
+    FS(VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_LINE_RASTERIZATION_FEATURES_EXT, VkPhysicalDeviceLineRasterizationFeaturesEXT)
+    FS(VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ATTACHMENT_FEEDBACK_LOOP_LAYOUT_FEATURES_EXT, VkPhysicalDeviceAttachmentFeedbackLoopLayoutFeaturesEXT)
+    FS(VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_COOPERATIVE_MATRIX_FEATURES_KHR, VkPhysicalDeviceCooperativeMatrixFeaturesKHR)
+    FS(VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_COMPUTE_SHADER_DERIVATIVES_FEATURES_KHR, VkPhysicalDeviceComputeShaderDerivativesFeaturesKHR)
+    FS(VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_DEMOTE_TO_HELPER_INVOCATION_FEATURES, VkPhysicalDeviceShaderDemoteToHelperInvocationFeatures)
+    FS(VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PRIMITIVE_TOPOLOGY_LIST_RESTART_FEATURES_EXT, VkPhysicalDevicePrimitiveTopologyListRestartFeaturesEXT)
+#undef FS
+    default: return 0;
+    }
+}
+static void vk_drop_missing_features(VkPhysicalDevice phys, VkBaseOutStructure *chain) {
+    for (VkBaseOutStructure *s = chain; s; s = s->pNext) {
+        size_t size = vk_feature_size(s->sType);
+        if (!size) { LOG("[vk] feature struct %d not checked\n", (int)s->sType); continue; }
+        unsigned char have[1024] = {0};
+        ((VkBaseOutStructure *)have)->sType = s->sType;
+        VkPhysicalDeviceFeatures2 q = {.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2};
+        VkBool32 *want, *got;
+        size_t from;
+        if (s->sType == VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2) {
+            vkGetPhysicalDeviceFeatures2(phys, &q);
+            want = (VkBool32 *)&((VkPhysicalDeviceFeatures2 *)s)->features, got = (VkBool32 *)&q.features;
+            from = 0, size = sizeof(VkPhysicalDeviceFeatures);
+        } else {
+            q.pNext = have;
+            vkGetPhysicalDeviceFeatures2(phys, &q);
+            want = (VkBool32 *)s, got = (VkBool32 *)have;
+            from = sizeof(VkBaseOutStructure), size = size;
+        }
+        for (size_t o = from; o + sizeof(VkBool32) <= size; o += sizeof(VkBool32)) {
+            VkBool32 *w = (VkBool32 *)((char *)want + o), *g = (VkBool32 *)((char *)got + o);
+            if (*w == VK_TRUE && *g != VK_TRUE) {
+                LOG("[vk] feature off (driver lacks it): struct %d, field %zu\n", (int)s->sType, (o - from) / 4);
+                *w = VK_FALSE;
+            }
+        }
+    }
+}
+#endif
+
 static void create_device(void) {
     uint32_t ne = 0;
     vkEnumerateDeviceExtensionProperties(g_vk.phys, NULL, &ne, NULL);
@@ -1154,6 +1226,9 @@ static void create_device(void) {
     VkDeviceCreateInfo di = {.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO, .pNext = &f, .queueCreateInfoCount = 1,
                              .pQueueCreateInfos = &qi, .enabledExtensionCount = n_ext, .ppEnabledExtensionNames = ext};
     if (ab_on) ab_feat.pNext = (void *)di.pNext, di.pNext = &ab_feat;
+#ifdef __ANDROID__
+    vk_drop_missing_features(g_vk.phys, (VkBaseOutStructure *)di.pNext);
+#endif
     VkResult created = vkCreateDevice(g_vk.phys, &di, NULL, &g_vk.dev);
 #ifdef _WIN32
     if (created == VK_SUCCESS && g_vk.dozen && ENV("LARECOMP_TEST_DX12_DEVICE_FAIL"))  // (tests the fallback below)
@@ -1355,6 +1430,14 @@ static void create_swapchain(void) {
     int w, h;
     SDL_GetWindowSizeInPixels(window, &w, &h);
     VkExtent2D ext = caps.currentExtent.width != UINT32_MAX ? caps.currentExtent : (VkExtent2D){(uint32_t)w, (uint32_t)h};
+#ifdef __ANDROID__
+    // Android: the picture as the window has it, and the compositor turns it to the panel (its transform is the panel's
+    // own rotation, which our frames don't apply)
+    LOG("[vk] surface transform %#x (supported %#x), extent %ux%u, window %dx%d\n", caps.currentTransform,
+        caps.supportedTransforms, caps.currentExtent.width, caps.currentExtent.height, w, h);
+    if (w > 0 && h > 0) ext = (VkExtent2D){(uint32_t)w, (uint32_t)h};
+    caps.currentTransform = VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR;
+#endif
     if (!ext.width || !ext.height) return;  // minimised
     uint32_t nf = 0;
     vkGetPhysicalDeviceSurfaceFormatsKHR(g_vk.phys, g_vk.surface, &nf, NULL);
@@ -2588,6 +2671,9 @@ void ui_window_init(void) {
     int win_w = 1280, win_h = 720;
     if (ENV("LARECOMP_WINDOW")) sscanf(ENV("LARECOMP_WINDOW"), "%dx%d", &win_w, &win_h);
     SDL_WindowFlags wflags = SDL_WINDOW_VULKAN | SDL_WINDOW_RESIZABLE | SDL_WINDOW_HIGH_PIXEL_DENSITY;
+#ifdef __ANDROID__
+    wflags |= SDL_WINDOW_FULLSCREEN;  // (no status and navigation bars)
+#endif
     if (ENV("LARECOMP_HIDDEN")) wflags |= SDL_WINDOW_HIDDEN;
     {   // scripted test runs (user input ignored: runtime/hle/input.c input_user_blocked) open without taking the
         // keyboard focus from whatever the player is doing

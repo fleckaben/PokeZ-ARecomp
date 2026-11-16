@@ -295,6 +295,11 @@ void plat_init(void) {
 
 // (inside an AppImage: the binary in its mount, which stays mounted while this process lives - re-exec included)
 bool plat_exe_path(char *buf, size_t size) {
+#ifdef __ANDROID__
+    // (the process is app_process: the resources sit in the data folder's res/, runtime/android_main.c)
+    const char *e = getenv("LARECOMP_EXE_PATH");
+    if (e && *e) return (size_t)snprintf(buf, size, "%s", e) < size;
+#endif
     ssize_t n = readlink("/proc/self/exe", buf, size - 1);
     if (n <= 0) return false;
     buf[n] = 0;

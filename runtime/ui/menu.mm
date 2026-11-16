@@ -367,6 +367,9 @@ void menu_apply_window_requests(void *win) {
     static bool first = true;
     if (first || g_want_fullscreen_apply.exchange(false)) {
         first = false;
+#ifdef __ANDROID__
+        g_settings.fullscreen = true;  // (Android: always the whole screen, no status or navigation bar)
+#endif
         SDL_SetWindowFullscreen(w, g_settings.fullscreen);
     }
     if (uint32_t r = __atomic_exchange_n(&g_window_resize_request, 0u, __ATOMIC_RELAXED))
