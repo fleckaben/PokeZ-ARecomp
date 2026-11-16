@@ -13,6 +13,10 @@
 #ifdef __linux__
 #include <errno.h>
 #include <sys/mman.h>
+#ifdef __ANDROID__
+#include <android/hardware_buffer.h>
+#include <sys/socket.h>
+#endif
 #include <unistd.h>
 #endif
 
@@ -5028,6 +5032,149 @@ static bool gmir_make(VkBuffer *buf, VkDeviceMemory *mem, uint64_t size) {
 
 // Guest window bytes [lo, lo + size) for shader global memory (gmem_info; the window: gwin - the heap, or Pokémon Z-A's
 // physical memory)
+
+#ifdef __ANDROID__
+// Android (Adreno has no VK_EXT_external_memory_host): Pokémon Z-A's physical memory - where its data lives, read by
+// shaders as global memory - is made of AHardwareBuffers mapped one after the other at its guest address before the
+// game starts, and Vulkan sees them as one sparse buffer: the game and the GPU share it as the desktop import does.
+// Without it every shader global memory read returned zero (characters and text not drawn). Pieces of 256 MB (512 MB is refused): the
+// Qualcomm allocator refuses (and its service crashed on) a single 2 GB one. The window is Z-A 2.0.2's: physical
+// memory 0x1676b00000 + 0xc9500000 and the storage copies' ring after it, to 0x1744000000 (gwin_pick).
+// LARECOMP_ANDROID_WINDOW=0: off.
+#define AW_LO 0x1676b00000ull
+#define AW_HI 0x1744000000ull
+#define AW_PIECE (256ull << 20)
+#define AW_MAX 16
+static int aw_n;
+static AHardwareBuffer *aw_ahb[AW_MAX];
+static VkDeviceMemory aw_mem[AW_MAX];
+static uint64_t aw_size[AW_MAX];
+static bool aw_ready;
+extern uint64_t g_plat_shared_lo, g_plat_shared_hi;
+
+static int aw_fd(AHardwareBuffer *b) {  // (the dma-buf behind it: through a socket, the public way to get it)
+    int sv[2];
+    if (socketpair(AF_UNIX, SOCK_SEQPACKET, 0, sv)) return -1;
+    int fd = -1;
+    if (AHardwareBuffer_sendHandleToUnixSocket(b, sv[0]) == 0) {
+        char data[1024], cbuf[CMSG_SPACE(sizeof(int) * 8)];
+        struct iovec iov = {data, sizeof data};
+        struct msghdr m = {.msg_iov = &iov, .msg_iovlen = 1, .msg_control = cbuf, .msg_controllen = sizeof cbuf};
+        if (recvmsg(sv[1], &m, 0) > 0)
+            for (struct cmsghdr *c = CMSG_FIRSTHDR(&m); c; c = CMSG_NXTHDR(&m, c))
+                if (c->cmsg_level == SOL_SOCKET && c->cmsg_type == SCM_RIGHTS) {
+                    int n = (int)((c->cmsg_len - CMSG_LEN(0)) / sizeof(int));
+                    int *fds = (int *)CMSG_DATA(c);
+                    if (n > 0) fd = fds[0];
+                    for (int i = 1; i < n; i++) close(fds[i]);
+                }
+    }
+    close(sv[0]);
+    close(sv[1]);
+    return fd;
+}
+
+static void aw_free(void) {
+    for (int i = 0; i < aw_n; i++) {
+        if (aw_mem[i]) vkFreeMemory(g_vk.dev, aw_mem[i], NULL);
+        if (aw_ahb[i]) AHardwareBuffer_release(aw_ahb[i]);
+        aw_mem[i] = VK_NULL_HANDLE, aw_ahb[i] = NULL;
+    }
+    aw_n = 0;
+}
+
+static void android_window(void) {
+    const char *e = getenv("LARECOMP_ANDROID_WINDOW");
+    if (aw_ready || !g_vk.ahb || (e && !atoi(e))) return;
+    PFN_vkGetAndroidHardwareBufferPropertiesANDROID props_of =
+        (PFN_vkGetAndroidHardwareBufferPropertiesANDROID)vkGetDeviceProcAddr(g_vk.dev, "vkGetAndroidHardwareBufferPropertiesANDROID");
+    if (!props_of) { LOG("[android] window: no vkGetAndroidHardwareBufferPropertiesANDROID\n"); return; }
+    for (uint64_t off = 0; off < AW_HI - AW_LO; off += AW_PIECE) {
+        uint64_t size = AW_HI - AW_LO - off < AW_PIECE ? AW_HI - AW_LO - off : AW_PIECE;
+        AHardwareBuffer_Desc d = {.width = (uint32_t)size, .height = 1, .layers = 1, .format = AHARDWAREBUFFER_FORMAT_BLOB,
+                                  .usage = AHARDWAREBUFFER_USAGE_CPU_READ_OFTEN | AHARDWAREBUFFER_USAGE_CPU_WRITE_OFTEN |
+                                           AHARDWAREBUFFER_USAGE_GPU_DATA_BUFFER};
+        AHardwareBuffer *b = NULL;
+        int r = AHardwareBuffer_allocate(&d, &b);
+        if (r || !b) { LOG("[android] window: AHardwareBuffer of %llu MB refused (%d)\n", (unsigned long long)(size >> 20), r); goto fail; }
+        aw_ahb[aw_n] = b;
+        aw_size[aw_n] = size;
+        aw_n++;
+        VkAndroidHardwareBufferPropertiesANDROID pr = {.sType = VK_STRUCTURE_TYPE_ANDROID_HARDWARE_BUFFER_PROPERTIES_ANDROID};
+        if (props_of(g_vk.dev, b, &pr) != VK_SUCCESS || !pr.memoryTypeBits) { LOG("[android] window: Vulkan can't import it\n"); goto fail; }
+        uint32_t type = (uint32_t)__builtin_ctz(pr.memoryTypeBits);
+        VkImportAndroidHardwareBufferInfoANDROID imp = {.sType = VK_STRUCTURE_TYPE_IMPORT_ANDROID_HARDWARE_BUFFER_INFO_ANDROID,
+                                                        .buffer = b};
+        VkMemoryAllocateInfo ai = {.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO, .pNext = &imp,
+                                   .allocationSize = pr.allocationSize, .memoryTypeIndex = type};
+        VkResult vr = vkAllocateMemory(g_vk.dev, &ai, NULL, &aw_mem[aw_n - 1]);
+        if (vr != VK_SUCCESS) { aw_mem[aw_n - 1] = VK_NULL_HANDLE; LOG("[android] window: import failed (%d)\n", vr); goto fail; }
+        int fd = aw_fd(b);
+        void *at = fd < 0 ? MAP_FAILED
+                          : mmap((void *)(uintptr_t)(AW_LO + off), size, PROT_READ | PROT_WRITE, MAP_SHARED | MAP_FIXED, fd, 0);
+        if (fd >= 0) close(fd);  // (the mapping keeps the buffer)
+        if (at != (void *)(uintptr_t)(AW_LO + off)) {
+            LOG("[android] window: can't map a piece at %llx (%s)\n", (unsigned long long)(AW_LO + off), fd < 0 ? "no dma-buf" : strerror(errno));
+            goto fail;
+        }
+        if (off == 0) LOG("[android] window: pieces in memory type %u (flags %#x), %llu bytes each\n", type,
+                          0u, (unsigned long long)pr.allocationSize);
+    }
+    for (uint64_t a = AW_LO; a < AW_HI; a += (AW_HI - AW_LO) / 8)
+        if (*(volatile uint64_t *)(uintptr_t)a) { memset((void *)(uintptr_t)AW_LO, 0, AW_HI - AW_LO); break; }
+    aw_ready = true;
+    g_plat_shared_lo = AW_LO, g_plat_shared_hi = AW_HI;
+    LOG("[android] window: %llu MB at %llx shared with the GPU (%d AHardwareBuffers)\n",
+        (unsigned long long)((AW_HI - AW_LO) >> 20), (unsigned long long)AW_LO, aw_n);
+    return;
+fail:
+    plat_reset_guest(AW_LO, AW_HI);  // (plain guest memory again where a piece was mapped)
+    aw_free();
+}
+
+// gmem_import's Android side: [addr, addr + size) as one sparse buffer over the shared pieces
+static VkResult android_window_buffer(uint64_t addr, uint64_t size, VkBuffer *out_buf, VkDeviceMemory *out_mem) {
+    if (!aw_ready || addr < AW_LO || addr + size > AW_HI) return VK_ERROR_FEATURE_NOT_PRESENT;
+    VkExternalMemoryBufferCreateInfo eb = {.sType = VK_STRUCTURE_TYPE_EXTERNAL_MEMORY_BUFFER_CREATE_INFO,
+                                           .handleTypes = VK_EXTERNAL_MEMORY_HANDLE_TYPE_ANDROID_HARDWARE_BUFFER_BIT_ANDROID};
+    VkBufferCreateInfo bi = {.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO, .pNext = &eb, .flags = VK_BUFFER_CREATE_SPARSE_BINDING_BIT,
+                             .size = size,
+                             .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_SRC_BIT |
+                                      VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT |
+                                      VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT |
+                                      VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT};
+    VkBuffer buf;
+    VkResult r = vkCreateBuffer(g_vk.dev, &bi, NULL, &buf);
+    if (r != VK_SUCCESS) { LOG("[android] window: sparse buffer refused (%d)\n", r); return r; }
+    VkMemoryRequirements req;
+    vkGetBufferMemoryRequirements(g_vk.dev, buf, &req);
+    VkSparseMemoryBind binds[AW_MAX];
+    uint32_t nb = 0;
+    for (int i = 0; i < aw_n; i++) {  // (each piece's part inside [addr, addr + size), at its place in the buffer)
+        uint64_t ps = AW_LO + (uint64_t)i * AW_PIECE, pe = ps + aw_size[i];
+        uint64_t lo = addr > ps ? addr : ps, hi = addr + size < pe ? addr + size : pe;
+        if (hi <= lo) continue;
+        uint64_t o = lo - addr, n = hi - lo;
+        if (o + n >= size) n = req.size - o;  // (the last one: up to the buffer's whole (aligned) size)
+        binds[nb++] = (VkSparseMemoryBind){.resourceOffset = o, .size = n, .memory = aw_mem[i], .memoryOffset = lo - ps};
+    }
+    VkSparseBufferMemoryBindInfo bb = {.buffer = buf, .bindCount = nb, .pBinds = binds};
+    VkBindSparseInfo si = {.sType = VK_STRUCTURE_TYPE_BIND_SPARSE_INFO, .bufferBindCount = 1, .pBufferBinds = &bb};
+    VkFenceCreateInfo fi = {.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO};
+    VkFence fence;
+    vkCreateFence(g_vk.dev, &fi, NULL, &fence);
+    vkQueueWaitIdle(g_vk.queue);
+    r = vkQueueBindSparse(g_vk.queue, 1, &si, fence);
+    if (r == VK_SUCCESS) r = vkWaitForFences(g_vk.dev, 1, &fence, VK_TRUE, 5000000000ull);
+    vkDestroyFence(g_vk.dev, fence, NULL);
+    if (r != VK_SUCCESS) { LOG("[android] window: sparse binding failed (%d)\n", r); vkDestroyBuffer(g_vk.dev, buf, NULL); return r; }
+    LOG("[android] window: one sparse buffer of %llu MB over %u pieces (alignment %llu)\n", (unsigned long long)(size >> 20), nb,
+        (unsigned long long)req.alignment);
+    *out_buf = buf;
+    *out_mem = VK_NULL_HANDLE;  // (the memory stays the window's)
+    return VK_SUCCESS;
+}
+#endif
 static bool gmem_import(uint64_t lo, uint64_t size) {
     VkBuffer buf;
     VkDeviceMemory mem;
@@ -5043,7 +5190,14 @@ static bool gmem_import(uint64_t lo, uint64_t size) {
             (unsigned long long)((SDL_GetTicksNS() - t0) / 1000000));
     }
 #endif
+#ifdef __ANDROID__
+    VkResult r = android_window_buffer(gwin_base + lo, size, &buf, &mem);
+    if (r != VK_SUCCESS) LOG("[android] window: %llx +%llx is not inside the shared window (%d)\n",
+                             (unsigned long long)(gwin_base + lo), (unsigned long long)size, r);
+    if (r != VK_SUCCESS && g_vk.host_import) r = host_import_ptr((void *)(uintptr_t)(gwin_base + lo), size, &buf, &mem, g_vk.gmem_addr);
+#else
     VkResult r = host_import_ptr((void *)(uintptr_t)(gwin_base + lo), size, &buf, &mem, g_vk.gmem_addr);
+#endif
     if (r != VK_SUCCESS) {
         LOG("[vk] gmem import: %d (%llu MB)\n", r, (unsigned long long)(size >> 20));
         // (#157: a driver refuses an import over pages that aren't committed - the first one found, in 1 MB steps;
@@ -5296,6 +5450,9 @@ void backend_guest_heap_prepare(void) {
 #ifdef __linux__
     guest_heap_dmabuf();
 #endif
+#ifdef __ANDROID__
+    if (g_vk.dev) android_window();
+#endif
     if (!g_vk.dev) return;
     gmem_chunk_shift();  // (the chunk / lazy decision, before the first draw binds anything)
 #ifdef __linux__
@@ -5312,6 +5469,9 @@ static uint64_t gmem_tried;  // heap size the import was last attempted for (gme
 
 static VkDescriptorBufferInfo gmem_info(void) {
     static int off = -1;
+#ifdef __ANDROID__
+    if (off < 0) off = ENV("LARECOMP_VK_NO_GMEM") != NULL || !(g_vk.host_import || aw_ready) || gc_lazy;
+#endif
     if (off < 0) off = ENV("LARECOMP_VK_NO_GMEM") != NULL || !g_vk.host_import || gc_lazy;  // (lazy: chunks instead)
     uint64_t want = (gwin_want() + 0xFFFF) & ~0xFFFFull;
     if (want > gwin_max) want = gwin_max;
@@ -5967,7 +6127,11 @@ static bool xm_on(void) {
         if (!on && !e) LOG("[vk] transform feedback mirror off (%s; LARECOMP_VK_XFB_MIRROR=1: on)\n",
                            cs == GPU_OFF ? "F1 > Compatibility" : "this AMD GPU, F1 > Compatibility to turn it on");
     }
+#ifdef __ANDROID__
+    return on;  // (no host import on Adreno: the mirror keeps transform feedback output away from the heap copies)
+#else
     return on && g_vk.host_import;
+#endif
 }
 
 static bool xm_inside(uint64_t a, uint64_t n) { return xm_lo && a >= xm_lo && a + n <= xm_lo + XM_SIZE; }

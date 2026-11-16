@@ -877,6 +877,15 @@ static void create_device(void) {
     if (g_vk.divisor) ext[n_ext++] = VK_EXT_VERTEX_ATTRIBUTE_DIVISOR_EXTENSION_NAME;
     g_vk.host_import = has_ext(ep, ne, VK_EXT_EXTERNAL_MEMORY_HOST_EXTENSION_NAME);  // guest heap as a GPU buffer (exec.c)
     if (g_vk.host_import) ext[n_ext++] = VK_EXT_EXTERNAL_MEMORY_HOST_EXTENSION_NAME;
+#ifdef __ANDROID__
+    // (no host pointer import on Adreno: Pokémon Z-A's memory is an AHardwareBuffer instead, exec.c android_window)
+    g_vk.ahb = has_ext(ep, ne, VK_ANDROID_EXTERNAL_MEMORY_ANDROID_HARDWARE_BUFFER_EXTENSION_NAME) &&
+               has_ext(ep, ne, VK_EXT_QUEUE_FAMILY_FOREIGN_EXTENSION_NAME);
+    if (g_vk.ahb) {
+        ext[n_ext++] = VK_ANDROID_EXTERNAL_MEMORY_ANDROID_HARDWARE_BUFFER_EXTENSION_NAME;
+        ext[n_ext++] = VK_EXT_QUEUE_FAMILY_FOREIGN_EXTENSION_NAME;
+    }
+#endif
     bool fault = has_ext(ep, ne, VK_EXT_DEVICE_FAULT_EXTENSION_NAME);  // device-lost diagnostics (vk_device_fault_report)
     if (fault) ext[n_ext++] = VK_EXT_DEVICE_FAULT_EXTENSION_NAME;
     g_fault_ext = fault;
@@ -1227,6 +1236,7 @@ static void create_device(void) {
                              .pQueueCreateInfos = &qi, .enabledExtensionCount = n_ext, .ppEnabledExtensionNames = ext};
     if (ab_on) ab_feat.pNext = (void *)di.pNext, di.pNext = &ab_feat;
 #ifdef __ANDROID__
+    f.features.sparseBinding = VK_TRUE;  // (exec.c android_window_buffer; dropped below where missing)
     vk_drop_missing_features(g_vk.phys, (VkBaseOutStructure *)di.pNext);
 #endif
     VkResult created = vkCreateDevice(g_vk.phys, &di, NULL, &g_vk.dev);

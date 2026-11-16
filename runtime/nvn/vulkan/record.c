@@ -619,6 +619,7 @@ static void present_run(const void *p) {
     // (Android: suboptimal on every present - the compositor turns our unrotated frames to the panel - and a new
     // swapchain each frame showed black frames)
     if (r == VK_ERROR_OUT_OF_DATE_KHR) atomic_store_explicit(&present_recreate, 1, memory_order_release);
+    else if (r == VK_SUBOPTIMAL_KHR) { if (a->id) vk_present_watch(a->id); }
 #else
     if (r == VK_ERROR_OUT_OF_DATE_KHR || r == VK_SUBOPTIMAL_KHR) atomic_store_explicit(&present_recreate, 1, memory_order_release);
 #endif

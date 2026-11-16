@@ -121,7 +121,19 @@ bool plat_reserve_guest(uint64_t lo, uint64_t hi) {
 }
 
 // Fresh zero pages over the whole window (the old ones are released at once). The new mapping is registered again.
+#ifdef __ANDROID__
+uint64_t g_plat_shared_lo, g_plat_shared_hi;  // (exec.c android_window: guest memory that is an AHardwareBuffer)
+#endif
 bool plat_reset_guest(uint64_t lo, uint64_t hi) {
+#ifdef __ANDROID__
+    if (g_plat_shared_hi && lo < g_plat_shared_hi && hi > g_plat_shared_lo) {
+        uint64_t a = lo > g_plat_shared_lo ? lo : g_plat_shared_lo, b = hi < g_plat_shared_hi ? hi : g_plat_shared_hi;
+        memset((void *)(uintptr_t)a, 0, b - a);
+        if (lo < a && !plat_reset_guest(lo, a)) return false;
+        if (hi > b && !plat_reset_guest(b, hi)) return false;
+        return true;
+    }
+#endif
     if (mmap((void *)(uintptr_t)lo, hi - lo, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS | MAP_NORESERVE | MAP_FIXED,
              -1, 0) != (void *)(uintptr_t)lo)
         return false;
