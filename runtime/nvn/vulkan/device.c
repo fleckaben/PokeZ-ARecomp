@@ -1434,6 +1434,9 @@ static VkPresentModeKHR present_mode(void) {
     return VK_PRESENT_MODE_FIFO_KHR;
 }
 
+#ifdef __ANDROID__
+static bool sc_new_surface;  // (recreate_surface: the swapchain is made for a new surface)
+#endif
 static void create_swapchain(void) {
     VkSurfaceCapabilitiesKHR caps;
     VK_CHECK(vkGetPhysicalDeviceSurfaceCapabilitiesKHR(g_vk.phys, g_vk.surface, &caps));
@@ -1482,6 +1485,9 @@ static void create_swapchain(void) {
         .imageSharingMode = VK_SHARING_MODE_EXCLUSIVE, .preTransform = caps.currentTransform,
         .compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR, .presentMode = present_mode(), .clipped = VK_TRUE,
         .oldSwapchain = old};
+#ifdef __ANDROID__
+    if (sc_new_surface) ci.oldSwapchain = VK_NULL_HANDLE;  // (the old one belongs to the old surface)
+#endif
     VkResult sr = vkCreateSwapchainKHR(g_vk.dev, &ci, NULL, &g_vk.swapchain);
 #ifdef _WIN32
     if (sr == VK_SUCCESS && g_vk.dozen && ENV("LARECOMP_TEST_DX12_SWAPCHAIN_FAIL"))  // (tests what follows)
@@ -1585,6 +1591,31 @@ static void recreate_swapchain(void) {
     create_swapchain();
 }
 
+#ifdef __ANDROID__
+// Android takes the window's surface away when the app goes to the background (sleep, home) and gives a new one when
+// it comes back: the old VkSurfaceKHR is lost for good (every acquire: VK_ERROR_SURFACE_LOST_KHR, a black screen).
+// A new surface on SDL's current window, and a swapchain on it. False while there is no window yet (still asleep).
+static bool recreate_surface(void) {
+    VkSurfaceKHR s;
+    if (!SDL_Vulkan_CreateSurface(window, g_vk.inst, NULL, &s)) {
+        static int n;
+        if (n++ < 4) LOG("[vk] window surface: none yet (%s)\n", SDL_GetError());
+        return false;
+    }
+    atomic_fetch_add(&g_window_stalls, 1);
+    rec_drain();
+    vkDeviceWaitIdle(g_vk.dev);
+    VkSurfaceKHR old = g_vk.surface;
+    g_vk.surface = s;
+    sc_new_surface = true;
+    create_swapchain();
+    sc_new_surface = false;
+    vkDestroySurfaceKHR(g_vk.inst, old, NULL);
+    LOG("[vk] window surface made again (the app came back): swapchain %ux%u\n", g_vk.sc_extent.width, g_vk.sc_extent.height);
+    return g_vk.swapchain != VK_NULL_HANDLE;
+}
+#endif
+
 // Time this thread spends waiting here - for a frame slot's GPU work, a window image, the presentation engine -
 // counts as idle for the frame pacer (pace.c), like the game's own waits: in FIFO (exclusive fullscreen
 // on Windows offers no mailbox) acquire / present block until the display's refresh, and counted as busy that made
@@ -1659,6 +1690,13 @@ bool vk_frame_begin(const float clear[4]) {
         WAITING_AT(1, r = vkAcquireNextImageKHR(g_vk.dev, g_vk.swapchain, UINT64_MAX, acquire_sem[slot], VK_NULL_HANDLE,
                                           &cur_frame.image));
     }
+#ifdef __ANDROID__
+    if (r == VK_ERROR_SURFACE_LOST_KHR) {
+        if (!recreate_surface()) { SDL_Delay(50); return false; }
+        WAITING_AT(1, r = vkAcquireNextImageKHR(g_vk.dev, g_vk.swapchain, UINT64_MAX, acquire_sem[slot], VK_NULL_HANDLE,
+                                          &cur_frame.image));
+    }
+#endif
     if (r != VK_SUCCESS && r != VK_SUBOPTIMAL_KHR) { LOG("[vk] acquire failed: %d\n", r); return false; }
     cur_frame.acquired = acquire_sem[slot];
     cur_frame.id++;
