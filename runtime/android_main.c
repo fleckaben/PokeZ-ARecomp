@@ -1,8 +1,8 @@
 // Android (SDL3's SDLActivity calls SDL_main in libmain.so): the folders the desktop builds take from the command line
 // and the environment. Data (saves, settings, caches, the log) in the app's internal storage; the game code library
 // next to this one in the APK's native library folder; the game files in internal storage if they are there, else
-// in /storage/emulated/0/ZARecomp/extracted. Straight into the game: no start screen (it builds game code and can
-// delete game files, neither of which an Android build can do).
+// in /storage/emulated/0/ZARecomp/extracted. ZA Recomp's start screen first, or straight into the game
+// (LARECOMP_ANDROID_PLAY, at the end).
 #ifdef __ANDROID__
 #define _GNU_SOURCE
 #include <SDL3/SDL.h>
@@ -124,7 +124,6 @@ __attribute__((visibility("default"))) int SDL_main(int argc, char **argv) {
     setenv("HOME", internal ? internal : data, 1);
     setenv("LARECOMP_DATA_HOME", data, 1);
     setenv("LARECOMP_DATA_ROOT", data, 1);
-    setenv("LARECOMP_NO_LAUNCHER", "1", 1);
     // (no Android on-screen keyboard: the F1 menu asked for text input and it covered half the screen; the name entry
     // has its own keyboard, driven by the controller)
     SDL_SetHint(SDL_HINT_ENABLE_SCREEN_KEYBOARD, "0");
@@ -174,7 +173,11 @@ __attribute__((visibility("default"))) int SDL_main(int argc, char **argv) {
     snprintf(root, sizeof root, "%s/extracted", data);
     snprintf(probe, sizeof probe, "%s/exefs/main", root);
     if (access(probe, R_OK)) snprintf(root, sizeof root, "/storage/emulated/0/ZARecomp/extracted");
-    char *args[] = {argv && argv[0] ? argv[0] : "zarecomp", root, "--play", NULL};
-    return main(3, args);
+    // ZA Recomp's start screen (Play, Mods, Saves, settings) first, as on PC. LARECOMP_ANDROID_PLAY=1 in data/env.txt:
+    // straight into the game instead (the start screen still comes up from "Title screen" in game)
+    const char *pl = getenv("LARECOMP_ANDROID_PLAY");
+    int play = pl && *pl && strcmp(pl, "0");
+    char *args[] = {argv && argv[0] ? argv[0] : "zarecomp", root, play ? "--play" : NULL, NULL};
+    return main(play ? 3 : 2, args);
 }
 #endif

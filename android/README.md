@@ -92,14 +92,22 @@ adb push extracted /sdcard/ZARecomp/
 adb shell appops set --uid local.za.recomp MANAGE_EXTERNAL_STORAGE allow
 ```
 
-Then start **ZA Recomp** from the launcher. Saves, settings and the log (`lasrecomp.log`) are in the app's private
-folder, `/data/data/local.za.recomp/files/data`. A `env.txt` file there (`KEY=VALUE` lines) sets options before the
-game starts.
+Then start **ZA Recomp** from the launcher. You get ZA Recomp's start screen, as on PC: Play, Mods, Saves and
+Settings. It shows "Ready to play" when the game files are found. Setting the game up from that screen doesn't work
+on Android: do it on the PC as above.
+
+Saves, settings and the log (`lasrecomp.log`) are in the app's private folder,
+`/data/data/local.za.recomp/files/data`. An `env.txt` file there (`KEY=VALUE` lines) sets options before the game
+starts. To skip the start screen and go straight into the game:
+
+```bash
+adb shell "run-as local.za.recomp sh -c 'echo LARECOMP_ANDROID_PLAY=1 >> files/data/env.txt'"
+```
 
 ## What changed for Android (for developers)
 
-- `runtime/android_main.c`: the entry point that SDL calls. It sets up folders, extracts fonts, keeps threads off the
-  prime cores and starts the game directly, with no start screen.
+- `runtime/android_main.c`: the entry point that SDL calls. It sets up folders, extracts fonts and keeps threads off
+  the prime cores. `gamelib.c` counts the game code inside the APK as built, so the start screen says "Ready to play".
 - Guest memory moved from `0x70_0000_0000` to `0x10_0000_0000`: Android puts its libraries in the old range, and
   phones have a 39-bit address space.
 - `hle/fiber.c`: an arm64 context switch, because Android's libc has no `swapcontext`.

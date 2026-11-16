@@ -72,6 +72,12 @@ bool gamelib_present(const char *game_dir) {
     if (g_tables) return !strcmp(g_tables->id, want);
     char c[3][1100];
     int n = candidates(game_dir, c);
+#ifdef __ANDROID__
+    // (the game code ships inside the APK - runtime/android_main.c points LARECOMP_GAME_LIB at it - without its .id
+    // file: present as given, the library's own id checked when it loads, gamelib_load)
+    const char *env = getenv("LARECOMP_GAME_LIB");
+    if (env && *env && exists(env)) return true;
+#endif
     for (int i = 0; i < n; i++)
         if (exists(c[i]) && id_matches(c[i], want)) return true;
     return false;
