@@ -31,6 +31,7 @@ typedef struct {
     void *sp;
     stack_t uc_stack;
     void *uc_link;
+    void (*fn)(void);  // set: a made context, started afresh each time it is loaded (the trampoline is reloaded so)
 } co_ctx;
 #define ucontext_t co_ctx
 void co_swap(void **save_sp, void *load_sp);
@@ -49,13 +50,23 @@ __asm__(".text\n.p2align 2\n.globl co_swap\n.hidden co_swap\nco_swap:\n"
 static int getcontext(ucontext_t *uc) { memset(uc, 0, sizeof *uc); return 0; }
 static void makecontext(ucontext_t *uc, void (*fn)(void), int argc) {
     (void)argc;
-    uint64_t *f = (uint64_t *)(((uintptr_t)uc->uc_stack.ss_sp + uc->uc_stack.ss_size) & ~(uintptr_t)15) - 20;
-    memset(f, 0, 160);
-    f[0] = (uint64_t)(uintptr_t)fn;           // x19
-    f[11] = (uint64_t)(uintptr_t)co_thunk;    // x30
-    uc->sp = f;
+    uc->fn = fn;
 }
-static int swapcontext(ucontext_t *save, const ucontext_t *load) { co_swap(&save->sp, load->sp); return 0; }
+// (a made context's first frame is written at its stack's top when it is loaded, not when it is made: the code that
+// runs there overwrites that area, and the trampoline's context is loaded again for every switch)
+static int swapcontext(ucontext_t *save, const ucontext_t *load) {
+    void *sp = load->sp;
+    if (load->fn) {
+        uint64_t *f = (uint64_t *)(((uintptr_t)load->uc_stack.ss_sp + load->uc_stack.ss_size) & ~(uintptr_t)15) - 20;
+        memset(f, 0, 160);
+        f[0] = (uint64_t)(uintptr_t)load->fn;      // x19
+        f[11] = (uint64_t)(uintptr_t)co_thunk;     // x30
+        sp = f;
+    }
+    if (save != load) save->fn = NULL;  // (saved from here on: its own registers, not a fresh start)
+    co_swap(&save->sp, sp);
+    return 0;
+}
 #else
 #include <sys/mman.h>
 #include <ucontext.h>

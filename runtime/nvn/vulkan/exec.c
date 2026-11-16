@@ -5102,7 +5102,19 @@ static void android_window(void) {
         aw_n++;
         VkAndroidHardwareBufferPropertiesANDROID pr = {.sType = VK_STRUCTURE_TYPE_ANDROID_HARDWARE_BUFFER_PROPERTIES_ANDROID};
         if (props_of(g_vk.dev, b, &pr) != VK_SUCCESS || !pr.memoryTypeBits) { LOG("[android] window: Vulkan can't import it\n"); goto fail; }
-        uint32_t type = (uint32_t)__builtin_ctz(pr.memoryTypeBits);
+        // (the CPU writes through its cache: a type the GPU sees coherently - cached coherent first (Adreno: 0xf),
+        // then coherent. The first allowed one was device-local only: the GPU read stale lines, garbage blocks)
+        VkPhysicalDeviceMemoryProperties mp;
+        vkGetPhysicalDeviceMemoryProperties(g_vk.phys, &mp);
+        uint32_t type = UINT32_MAX;
+        const VkMemoryPropertyFlags prefs[2] = {VK_MEMORY_PROPERTY_HOST_COHERENT_BIT | VK_MEMORY_PROPERTY_HOST_CACHED_BIT,
+                                                VK_MEMORY_PROPERTY_HOST_COHERENT_BIT};
+        for (int k = 0; k < 2 && type == UINT32_MAX; k++)
+            for (uint32_t i = 0; i < mp.memoryTypeCount && type == UINT32_MAX; i++)
+                if ((pr.memoryTypeBits >> i & 1) && (mp.memoryTypes[i].propertyFlags & prefs[k]) == prefs[k]) type = i;
+        if (type == UINT32_MAX) type = (uint32_t)__builtin_ctz(pr.memoryTypeBits);
+        if (off == 0) LOG("[android] window: allowed memory types %#x, chosen %u (flags %#x)\n", pr.memoryTypeBits, type,
+                          mp.memoryTypes[type].propertyFlags);
         VkImportAndroidHardwareBufferInfoANDROID imp = {.sType = VK_STRUCTURE_TYPE_IMPORT_ANDROID_HARDWARE_BUFFER_INFO_ANDROID,
                                                         .buffer = b};
         VkMemoryAllocateInfo ai = {.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO, .pNext = &imp,
@@ -5120,8 +5132,8 @@ static void android_window(void) {
         if (off == 0) LOG("[android] window: pieces in memory type %u (flags %#x), %llu bytes each\n", type,
                           0u, (unsigned long long)pr.allocationSize);
     }
-    for (uint64_t a = AW_LO; a < AW_HI; a += (AW_HI - AW_LO) / 8)
-        if (*(volatile uint64_t *)(uintptr_t)a) { memset((void *)(uintptr_t)AW_LO, 0, AW_HI - AW_LO); break; }
+    // (all of it: the allocator hands back recycled buffers - another app's images showed through as garbage blocks)
+    memset((void *)(uintptr_t)AW_LO, 0, AW_HI - AW_LO);
     aw_ready = true;
     g_plat_shared_lo = AW_LO, g_plat_shared_hi = AW_HI;
     LOG("[android] window: %llu MB at %llx shared with the GPU (%d AHardwareBuffers)\n",
