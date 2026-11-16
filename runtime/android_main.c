@@ -47,6 +47,9 @@ __attribute__((visibility("default"))) int SDL_main(int argc, char **argv) {
     setenv("LARECOMP_DATA_HOME", data, 1);
     setenv("LARECOMP_DATA_ROOT", data, 1);
     setenv("LARECOMP_NO_LAUNCHER", "1", 1);
+    // (no Android on-screen keyboard: the F1 menu asked for text input and it covered half the screen; the name entry
+    // has its own keyboard, driven by the controller)
+    SDL_SetHint(SDL_HINT_ENABLE_SCREEN_KEYBOARD, "0");
     {   // data/env.txt: KEY=VALUE lines set before anything reads them (tests without a rebuild)
         char envf[1100], line[512];
         snprintf(envf, sizeof envf, "%s/env.txt", data);
