@@ -38,6 +38,12 @@ static VkFormat depth24_stencil8(void) {
         VkFormatFeatureFlags want = VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_FORMAT_FEATURE_SAMPLED_IMAGE_BIT |
                                     VK_FORMAT_FEATURE_TRANSFER_SRC_BIT | VK_FORMAT_FEATURE_TRANSFER_DST_BIT |
                                     VK_FORMAT_FEATURE_BLIT_SRC_BIT | VK_FORMAT_FEATURE_BLIT_DST_BIT;
+#ifdef __ANDROID__
+        // (Adreno: no blits into either depth format - D32S8 lacks them too - and scaled depth copies already go through
+        // a colour image. D24S8 is the Switch's own format: decals and ivy laid on walls with a depth bias came and
+        // went with the camera's angle in D32 float)
+        want &= ~(VkFormatFeatureFlags)VK_FORMAT_FEATURE_BLIT_DST_BIT;
+#endif
         bool ok = (p.optimalTilingFeatures & want) == want && !(e && !atoi(e));
         f = ok ? VK_FORMAT_D24_UNORM_S8_UINT : VK_FORMAT_D32_SFLOAT_S8_UINT;
         LOG("[vk] depth24 stencil8: %s\n", ok ? "D24_UNORM_S8_UINT" : "D32_SFLOAT_S8_UINT");

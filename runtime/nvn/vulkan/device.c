@@ -2197,6 +2197,15 @@ void vk_frame_end(const char *shot_path) {
 }
 
 void vk_save_png(const char *path, const uint8_t *rgba, uint32_t w, uint32_t h) {
+#ifdef __ANDROID__
+    // (SDL opens a relative path as an APK asset on Android: from the working folder, the data root, instead)
+    char abs_path[1200];
+    if (path[0] != '/' && getcwd(abs_path, 900)) {
+        size_t n = strlen(abs_path);
+        snprintf(abs_path + n, sizeof abs_path - n, "/%s", path);
+        path = abs_path;
+    }
+#endif
     SDL_Surface *s = SDL_CreateSurfaceFrom((int)w, (int)h, SDL_PIXELFORMAT_ABGR8888, (void *)rgba, (int)w * 4);
     if (!s || !SDL_SavePNG(s, path)) LOG("[vk] saving %s failed: %s\n", path, SDL_GetError());
     else LOG("[vk] saved %s (%ux%u)\n", path, w, h);

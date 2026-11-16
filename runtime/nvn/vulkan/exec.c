@@ -5092,8 +5092,13 @@ static void android_window(void) {
     if (!props_of) { LOG("[android] window: no vkGetAndroidHardwareBufferPropertiesANDROID\n"); return; }
     for (uint64_t off = 0; off < AW_HI - AW_LO; off += AW_PIECE) {
         uint64_t size = AW_HI - AW_LO - off < AW_PIECE ? AW_HI - AW_LO - off : AW_PIECE;
+        // (LARECOMP_ANDROID_WINDOW_UNCACHED=1, test: the CPU maps it uncached - GPU writes the game reads back, the
+        // visibility its culling computes, can't sit behind stale cache lines)
+        static int unc = -1;
+        if (unc < 0) unc = getenv("LARECOMP_ANDROID_WINDOW_UNCACHED") && atoi(getenv("LARECOMP_ANDROID_WINDOW_UNCACHED"));
         AHardwareBuffer_Desc d = {.width = (uint32_t)size, .height = 1, .layers = 1, .format = AHARDWAREBUFFER_FORMAT_BLOB,
-                                  .usage = AHARDWAREBUFFER_USAGE_CPU_READ_OFTEN | AHARDWAREBUFFER_USAGE_CPU_WRITE_OFTEN |
+                                  .usage = (unc ? AHARDWAREBUFFER_USAGE_CPU_READ_RARELY | AHARDWAREBUFFER_USAGE_CPU_WRITE_RARELY
+                                                : AHARDWAREBUFFER_USAGE_CPU_READ_OFTEN | AHARDWAREBUFFER_USAGE_CPU_WRITE_OFTEN) |
                                            AHARDWAREBUFFER_USAGE_GPU_DATA_BUFFER};
         AHardwareBuffer *b = NULL;
         int r = AHardwareBuffer_allocate(&d, &b);
@@ -8410,7 +8415,16 @@ static void draw_(CmdRec *r, bool indexed) {
     }
     ss_enabled();
     if (!atomic_load_explicit(&pp->used, memory_order_relaxed)) first_use(&pp->used, pp->k.prog->hash[0], pp->k.prog->hash[1]);
-    if (ss_need(SS_PIPE, ss.pipe == pp)) { ss.pipe = pp; rec_CmdBindPipelineObj(cb, VK_PIPELINE_BIND_POINT_GRAPHICS, pp); }
+    if (ss_need(SS_PIPE, ss.pipe == pp)) {
+        ss.pipe = pp;
+        rec_CmdBindPipelineObj(cb, VK_PIPELINE_BIND_POINT_GRAPHICS, pp);
+#ifdef __ANDROID__
+        // (Adreno: a pipeline bind loses the dynamic state set before it - left out as unchanged, the arches' and
+        // ivy's draws after another pipeline kept wrong state for a frame or many, flat and untextured with the
+        // camera's angle. The pipeline's own bit stays known; everything dynamic is set again)
+        ss.known = SS_PIPE | (ss.known & (SS_IB));
+#endif
+    }
     if (g_vk.vids && ss_need(SS_VI, !memcmp(&ss.vi, &vl, sizeof vl))) { ss.vi = vl; set_vertex_input(cb, &vl); }
     uint64_t prof_td_ = prof ? SDL_GetTicksNS() : 0;
     if (prof) prof_key += prof_td_ - prof_tk_;
