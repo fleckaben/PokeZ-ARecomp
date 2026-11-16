@@ -1,3 +1,7 @@
+> **Android fork (beta).** This copy adds an unofficial Android port, tested only on an AYN Odin 3 and made with an AI
+> coding assistant. See [android/README.md](android/README.md). For PC and Mac, use the original project:
+> [Hexveil404/PokeZ-ARecomp](https://github.com/Hexveil404/PokeZ-ARecomp).
+
 <div align="center">
 
 <img src="docs/icon/icon_1024.png" alt="ZA Recomp" width="128">

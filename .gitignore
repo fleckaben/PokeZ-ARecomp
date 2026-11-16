@@ -36,3 +36,6 @@ __pycache__/
 /tools/hdtools/
 # Claude Code: machine-specific notes
 CLAUDE.local.md
+
+# Android: your own signing key (android/build_apk.sh makes it)
+android/debug.keystore

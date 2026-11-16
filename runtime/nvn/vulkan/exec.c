@@ -5092,13 +5092,8 @@ static void android_window(void) {
     if (!props_of) { LOG("[android] window: no vkGetAndroidHardwareBufferPropertiesANDROID\n"); return; }
     for (uint64_t off = 0; off < AW_HI - AW_LO; off += AW_PIECE) {
         uint64_t size = AW_HI - AW_LO - off < AW_PIECE ? AW_HI - AW_LO - off : AW_PIECE;
-        // (LARECOMP_ANDROID_WINDOW_UNCACHED=1, test: the CPU maps it uncached - GPU writes the game reads back, the
-        // visibility its culling computes, can't sit behind stale cache lines)
-        static int unc = -1;
-        if (unc < 0) unc = getenv("LARECOMP_ANDROID_WINDOW_UNCACHED") && atoi(getenv("LARECOMP_ANDROID_WINDOW_UNCACHED"));
         AHardwareBuffer_Desc d = {.width = (uint32_t)size, .height = 1, .layers = 1, .format = AHARDWAREBUFFER_FORMAT_BLOB,
-                                  .usage = (unc ? AHARDWAREBUFFER_USAGE_CPU_READ_RARELY | AHARDWAREBUFFER_USAGE_CPU_WRITE_RARELY
-                                                : AHARDWAREBUFFER_USAGE_CPU_READ_OFTEN | AHARDWAREBUFFER_USAGE_CPU_WRITE_OFTEN) |
+                                  .usage = AHARDWAREBUFFER_USAGE_CPU_READ_OFTEN | AHARDWAREBUFFER_USAGE_CPU_WRITE_OFTEN |
                                            AHARDWAREBUFFER_USAGE_GPU_DATA_BUFFER};
         AHardwareBuffer *b = NULL;
         int r = AHardwareBuffer_allocate(&d, &b);
@@ -5135,8 +5130,7 @@ static void android_window(void) {
             LOG("[android] window: can't map a piece at %llx (%s)\n", (unsigned long long)(AW_LO + off), fd < 0 ? "no dma-buf" : strerror(errno));
             goto fail;
         }
-        if (off == 0) LOG("[android] window: pieces in memory type %u (flags %#x), %llu bytes each\n", type,
-                          0u, (unsigned long long)pr.allocationSize);
+        if (off == 0) LOG("[android] window: pieces of %llu bytes\n", (unsigned long long)pr.allocationSize);
     }
     // (all of it: the allocator hands back recycled buffers - another app's images showed through as garbage blocks)
     memset((void *)(uintptr_t)AW_LO, 0, AW_HI - AW_LO);

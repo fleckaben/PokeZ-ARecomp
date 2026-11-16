@@ -26,8 +26,9 @@ static inline void __attribute__((format(printf, 1, 2))) rt_log(const char *fmt,
 #define FATAL(...) (rt_fatal_msg(__VA_ARGS__), rt_fatal_trace())  // (runtime/crash_explain.c keeps the line)
 
 // ---- address space layout (guest addresses == host addresses)
-// macOS reserves 0x2_0000_0000-0x70_0000_0000, and guest addresses must fit in 39 bits, so the
-// guest lives in a 12.5 GB window at 0x70_0000_0000 claimed at startup (see main.c).
+// This Android fork: the guest window is at 0x10_0000_0000 (upstream: 0x70_0000_0000). Android maps its libraries at
+// 0x6f-0x7f_0000_0000 and arm64 phones have a 39-bit address space. macOS reserves 0x2_0000_0000-0x70_0000_0000, so
+// this fork does NOT run on macOS; for PC and Mac use upstream (Hexveil404/PokeZ-ARecomp).
 #define GUEST_LO     0x1000000000ull
 #ifdef __APPLE__
 #define GUEST_HI     0x1320000000ull
