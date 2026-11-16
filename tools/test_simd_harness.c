@@ -13,9 +13,9 @@
 extern GuestFn tests[];
 extern int ntests;
 
-#define BUF 0x7200000000ull
+#define BUF 0x1200000000ull
 #define BUF_SIZE 0x20000
-#define CODE 0x7210000000ull
+#define CODE 0x1210000000ull
 
 void rt_dispatch(Cpu *c) { (void)c; }
 void rt_svc(Cpu *c, uint32_t imm, uint64_t pc) { (void)c; (void)imm; (void)pc; }

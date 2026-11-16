@@ -1,6 +1,6 @@
 """Per-instruction replacements applied by gen.py (guest address -> function(gen, addr) returning C code).
 
-Widescreen: the game's camera code loads a 16:9 aspect-ratio literal (0x70016afba4) as the default
+Widescreen: the game's camera code loads a 16:9 aspect-ratio literal (0x10016afba4) as the default
 projection aspect. These loads are redirected to rt_aspect_site(), which returns the aspect for the
 current output shape (or 16:9) per site, so only the 3D cameras widen.
 """
@@ -9,7 +9,7 @@ from game_addresses import ADDRESS as A, addr_text
 
 ASPECT_LITERAL = A.ASPECT_LITERAL
 
-# address of `ldr sN, [xM, #0xba4]` -> site id (0x7001023c70 is UI layout math: left alone)
+# address of `ldr sN, [xM, #0xba4]` -> site id (0x1001023c70 is UI layout math: left alone)
 ASPECT_SITES = {
     A.ASPECT_SITES_0: 0,
     A.ASPECT_SITES_1: 1,
@@ -32,7 +32,7 @@ PATCHES = {a: _aspect_load for a in ASPECT_SITES}
 
 
 # Off-screen culling: the scene's visibility pass loads the camera's aspect from [x27, #0x570] into s9
-# (`ldr s9, [x27, #0x570]` at 0x7000852ad4). The community 32:9 patch (Jaddey / KeatonTheBot, build
+# (`ldr s9, [x27, #0x570]` at 0x1000852ad4). The community 32:9 patch (Jaddey / KeatonTheBot, build
 # AE16F71E...) forces s9 here; we load the runtime aspect instead (site 6).
 CULL_ASPECT = A.CULL_ASPECT
 
@@ -88,7 +88,7 @@ for _a in SKYSEA_BOX_SITES:
     PATCHES[_a] = _skysea_box
 
 
-# Indoor detection: 0x7001023c70 (`ldr s1, =16/9`) is in the indoor shadow setup (community patch notes:
+# Indoor detection: 0x1001023c70 (`ldr s1, =16/9`) is in the indoor shadow setup (community patch notes:
 # "Indoor Shadow AR"). It keeps loading 16:9 and tells the runtime an interior is being rendered.
 INDOOR_SITE = A.INDOOR_SITE
 
@@ -152,7 +152,7 @@ MSTALFOS_JUMP_SITE = A.MSTALFOS_JUMP_SITE  # fsub s0, s0, s1
 
 # Moblin Chief deletes himself in his init (main+0x1f8af0) unless a story bit is set (player status +0xac bit 7 - his
 # hideout's time); on the Field (seeds) that check is skipped. The defeated check before it stays.
-MCHIEF_STORY_SITE = A.MCHIEF_STORY_SITE  # tbnz w8, #7, 0x70001f8b58
+MCHIEF_STORY_SITE = A.MCHIEF_STORY_SITE  # tbnz w8, #7, 0x10001f8b58
 
 
 # Generated dungeons (runtime/hle/chamber.c): every level jump goes through the request processor main+0x81ba80
@@ -239,7 +239,7 @@ ITEM_NAME_SITE = A.ITEM_NAME_SITE
 
 def _item_name(gen, a):
     w = struct.unpack_from('<I', gen.nso.image, a - gen.base)[0]
-    assert w == 0x94035896, hex(w)  # bl 0x7000f8c8b0
+    assert w == 0x94035896, hex(w)  # bl 0x1000f8c8b0
     return addr_text('c->x[30] = 0x@ITEM_NAME_RETURN@ull; { extern int rt_hide_item_explanation(void); '
             'if (!rt_hide_item_explanation()) f_@ITEM_NAME_TARGET@(c); }'
             f'  /* {a:#x}: bl 0xf8c8b0 (set the item name pane) */')
@@ -369,7 +369,7 @@ PATCHES[RES_NAME_SITE] = _res_name
 
 
 # Field mini-bosses (enemy randomizer, runtime/hle/miniboss.c): a mini-boss waits in its idle state until its dungeon
-# room's start event runs, which never happens in the Field. f_70000ec310 (an actor component's per-frame update)
+# room's start event runs, which never happens in the Field. f_10000ec310 (an actor component's per-frame update)
 # asks its actor a type question through vtable +0x68 every frame: the runtime sees each actor there, picks out the
 # mini-boss classes by vtable and moves them into their fight state itself.
 MB_SEEN_SITE = A.MB_SEEN_SITE
@@ -377,8 +377,8 @@ MB_SEEN_SITE = A.MB_SEEN_SITE
 
 
 
-# Frame pacing (runtime/hle/framepace.c): the game's frame timer (f_700000c910) advances by its frame period times
-# the swap interval it reads from the system object (+0x812c, written only by the interval setter f_7000017800). It
+# Frame pacing (runtime/hle/framepace.c): the game's frame timer (f_100000c910) advances by its frame period times
+# the swap interval it reads from the system object (+0x812c, written only by the interval setter f_1000017800). It
 # reads it here and nowhere else: we hand it the number of vsyncs that really passed since the last frame, so a
 # late frame advances the world by the time that passed (no slow motion below 60 fps).
 FRAME_STEPS_SITE = A.FRAME_STEPS_SITE
@@ -397,11 +397,11 @@ PATCHES[FRAME_STEPS_SITE] = _frame_steps
 
 # The game's own dynamic resolution, off: resolution is ours to choose (runtime/nvn/output_scale.c - a fixed choice
 # renders at exactly that size, "Dynamic" is our scaler alone). The game sizes its main pass by a level (renderer
-# +0x6e4c, docked): 1080 - 36 x level lines at 16:9 (f_7001023c10), level 0 = 1920x1080, 9 = 1344x756, 10 = 1280x720.
+# +0x6e4c, docked): 1080 - 36 x level lines at 16:9 (f_1001023c10), level 0 = 1920x1080, 9 = 1344x756, 10 = 1280x720.
 # Its scaler (the object at +0x648: enabled byte, table indexes, the level tables - docked [0 3 6 9 10]) is set up at
-# boot (f_700107cb90) at the first table level >= the boot default (8: so 9, 1344x756). Then each frame its frame
-# controller (f_700000c910) turns its GPU timing counters (renderer+0x81c0) into a load figure (GPU time x 100 /
-# (16.67 ms x swap interval)); 6 frames all over 90%: one level down the table (f_700107d110), 6 all under 70%: up.
+# boot (f_100107cb90) at the first table level >= the boot default (8: so 9, 1344x756). Then each frame its frame
+# controller (f_100000c910) turns its GPU timing counters (renderer+0x81c0) into a load figure (GPU time x 100 /
+# (16.67 ms x swap interval)); 6 frames all over 90%: one level down the table (f_100107d110), 6 all under 70%: up.
 # GAME_DYNRES_SITE: the enabled byte reads as 0 - no samples, no steps. GAME_DYNRES_INIT_SITE: the set-up reads the
 # boot default as 0 - it starts (and so stays) at level 0, full size. The rest of the frame controller - the 30 fps
 # mode, which reads the same counters - runs as before. LARECOMP_GAME_DYNRES=1 (test): the game's own again.
@@ -429,15 +429,15 @@ PATCHES[GAME_DYNRES_SITE] = _game_dynres
 PATCHES[GAME_DYNRES_INIT_SITE] = _game_dynres_init
 
 
-# Digsanity (runtime/hle/digs.c): the shovel's dig commit (f_7000ddc530) spawns the hole actor (ObjHolesDug 0x1cd)
-# through f_7000d228d0(&out, transform x21, zone, &room, ...); right after it the hole (out at [sp+0x10]) and its
+# Digsanity (runtime/hle/digs.c): the shovel's dig commit (f_1000ddc530) spawns the hole actor (ObjHolesDug 0x1cd)
+# through f_1000d228d0(&out, transform x21, zone, &room, ...); right after it the hole (out at [sp+0x10]) and its
 # snapped tile-centre position (x21) tell the runtime which tile was dug - the first dig of a tile gives its item.
 DIG_HOLE_SITE = A.DIG_HOLE_SITE
 
 
 
 # The game keeps its dug holes in a list (main+0x1cbae80, count at +0x10) and fills in the oldest ones once there are
-# more than 80 (f_7000d22d10: while count > 0x50). Digsanity keeps holes open: the limit comes from the runtime.
+# more than 80 (f_1000d22d10: while count > 0x50). Digsanity keeps holes open: the limit comes from the runtime.
 HOLE_CAP_SITES = (A.HOLE_CAP_SITES_0, A.HOLE_CAP_SITES_1)  # cmp x8, #0x51 / cmp x8, #0x50
 
 
@@ -475,7 +475,7 @@ def _bottle1_use(gen, a):
 PATCHES[BOTTLE1_USE_SITE] = _bottle1_use
 
 
-# Boss souls (runtime/hle/souls.c): the actor factory f_70008f5ea0 (x2 = spawn info, type u16 at +8) takes the type's
+# Boss souls (runtime/hle/souls.c): the actor factory f_10008f5ea0 (x2 = spawn info, type u16 at +8) takes the type's
 # create function from the actor table (main+0x1bcc898, 0x58 bytes per type, +0 create fn, +0x50 name); a null fn is
 # its "no such actor" path (the caller gets an empty handle). A dungeon boss whose soul isn't found yet gets that path.
 BOSS_SPAWN_SITE = A.BOSS_SPAWN_SITE
@@ -785,7 +785,7 @@ def _font_box_glyph(gen, a):
 PATCHES[FONT_BOX_GLYPH_SITE] = _font_box_glyph
 
 
-# Issue #19: [this+0x10] is the delegate of a recycled "action" object (the class whose vtable is 0x7001c51358, and
+# Issue #19: [this+0x10] is the delegate of a recycled "action" object (the class whose vtable is 0x1001c51358, and
 # the ~100 siblings sharing these forwarders). Its slot +0x28 (main+0x10cce50) and +0x30 (main+0x10cce30) forward to
 # that delegate without checking it, while the class's own slot +0x38 (main+0x10cce80) checks *its* delegate (+0x18)
 # with `cbz` and returns when there is none. The task loop (main+0x13c21e0) picks the slot from the task's state and
@@ -834,7 +834,7 @@ FRAME_JOB_KICKOFF_SITES = [A.FRAME_JOB_KICKOFF_SITES_0, A.FRAME_JOB_KICKOFF_SITE
 FRAME_JOB_FINISH_SITE = A.FRAME_JOB_FINISH_SITE
 
 # Startup hang (Windows, few cores): a call run on its object's owner thread. main+0x1048cf0 (slot +0x48 of the class
-# whose vtable is 0x7001c490b0; a loader thread calls it for an object O the main thread owns) locks O's mutex (O+0x18),
+# whose vtable is 0x1001c490b0; a loader thread calls it for an object O the main thread owns) locks O's mutex (O+0x18),
 # posts a task to the owner's queue ([O+8]) and waits on O's condition variable (O+0x38) once, with no predicate. The
 # task (main+0x1049ed0, on the main thread) stores the result at O+0x10 and calls notify_one without taking O's mutex.
 # If the loader thread is preempted between its post and its wait, the notify finds nobody and the loader waits forever,

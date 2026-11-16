@@ -16,7 +16,7 @@ from lifter import Lifter, Unsupported, emit_asm_batch, bits
 from nso import Nso
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-BUF = 0x7200000000
+BUF = 0x1200000000
 BUF_SIZE = 0x40000
 BUF_MID = BUF + 0x10000
 STATE_FMT = '<32Q Q Q Q 32Q 32Q Q'  # x[32], sp, nzcv, pc, v lo[32], v hi[32], buffer-hash-ish (unused in)

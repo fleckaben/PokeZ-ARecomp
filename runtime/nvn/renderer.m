@@ -2140,7 +2140,7 @@ static void bind_textures(int stage, ShaderInfo *si) {
 
 // ---- storage buffers the game rewrites one frame ahead (overlap)
 // The game's tiled light / exposure lists: each frame its CPU memcpys the list for the frame after this one into
-// the buffer the frame being drawn reads (7281e33500+32640 and 7281e3bd00+2040, alternating by frame; f_7000fe5960
+// the buffer the frame being drawn reads (7281e33500+32640 and 7281e3bd00+2040, alternating by frame; f_1000fe5960
 // found with LARECOMP_WATCH_ADDR), which the Switch's fence made safe. With the fence deferred that copy lands while
 // the GPU still reads the list: screen-aligned tiles without shadow, a dark saturated picture when the exposure
 // program (72a8da6000) reads it - worse the slower the GPU. Other storage data (the skinning program 72a8da0000's
@@ -2334,7 +2334,7 @@ bool renderer_watch_fault(uint64_t fa) {
     // small lists' stores were never seen), so a store inside a list marks every watched range on its page too.
     // Not so a store into a small parameter block (the skinning dispatch's 12-byte slot 5, rewritten every frame):
     // it says nothing about the buffers beside it, and marking them copied BowWow's skinning output, which the
-    // CPU reads back every frame (f_700102d0f4: the body's chain) - read from the frozen original once the dispatch
+    // CPU reads back every frame (f_100102d0f4: the body's chain) - read from the frozen original once the dispatch
     // wrote the copy, the body came apart into spikes as a companion indoors. A store outside every range (per-frame
     // constants next to a buffer) only opens the page. LARECOMP_LOG_BINDS: "[snap] ... never inside" shows what
     // this marked by neighbourhood.

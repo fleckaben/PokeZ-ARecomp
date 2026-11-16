@@ -169,33 +169,33 @@ RtJmp *rt_setjmp_site(Cpu *c, uint64_t ret) {
 }
 
 // Pokemon Z-A, main 8A1C86C437394B69 (2.0.0; 2.0.2 below): two start-up steps that the game only reaches through pointers, on different
-// threads. f_7000ac2a2c stores a delegate in the object at 0x7006109cc0 (+0xc0), but silently does nothing if that object
-// isn't ready yet (its flag at +0x140); f_7000bbb0dc then calls the delegate (f_7000bbb174) without checking it. So a step
+// threads. f_1000ac2a2c stores a delegate in the object at 0x1006109cc0 (+0xc0), but silently does nothing if that object
+// isn't ready yet (its flag at +0x140); f_1000bbb0dc then calls the delegate (f_1000bbb174) without checking it. So a step
 // that came too early ends much later in "no function at 0 (lr=7000bbb1ac)": #101 #111, both on a slow first start, both
 // gone on the next one. Here the object is ready ~0.7 s before the store, and a store 3 s late only delays the call.
 // Skipping the empty delegate is no way out (the game then stays on an empty screen for good), so each step waits for
 // what it needs, within reason. The "[boot]" lines tell which case a report was. LARECOMP_BOOT_DELEGATE_WAIT=0: no waits.
 // LARECOMP_TEST_OBJECT_LATE=<ms>: the object seems not ready at the first step for that long (with no waits: the crash).
-// The same two steps on 2.0.2 (main B1F12FD919EAE86A): #157's "accessing 0" at lr 7000bb9d9c is f_7000bb9d64+0x38, the
-// twin of 2.0.0's f_7000bbb174+0x38. Found by matching the functions (immediates masked: 20 of 20 / 19 of 20 words)
+// The same two steps on 2.0.2 (main B1F12FD919EAE86A): #157's "accessing 0" at lr 7000bb9d9c is f_1000bb9d64+0x38, the
+// twin of 2.0.0's f_1000bbb174+0x38. Found by matching the functions (immediates masked: 20 of 20 / 19 of 20 words)
 // and the object's adrp+add in both the store and the call - the code around them is the same, so are the offsets.
 // #220 (2.0.0, i9-13900KF + RTX 4090): the call came first and the store never came in 30 s - the main thread was the
 // one waiting, and the store evidently needs it to go on, so the wait itself held the store back; after it, the same
 // "no function at 0" (and, killed during the wait, "PLAY does nothing"). So the call waits only a little
 // (LARECOMP_BOOT_DELEGATE_WAIT_MS, default 2000: a store that is merely late, as #101 #111), then runs its step
-// without the delegate - everything else it starts goes on - and the delegate's own call (f_7000bbb174 / f_7000bb9d64,
+// without the delegate - everything else it starts goes on - and the delegate's own call (f_1000bbb174 / f_1000bb9d64,
 // the step's last call: + 0x98, the same in both builds) waits for the store and is made by the store's thread right
 // after it stores. LARECOMP_BOOT_DELEGATE_DEFER=0: the old 30 s wait. LARECOMP_TEST_STORE_LATE=<ms> (test): the store
 // waits that long before storing, so the call comes first.
-// 1.0.0 (main 7222E13ECF6ADB32) has the same race: #276 crashed at "host pc 0", lr 7000480c50 = f_7000480c18+0x38 with
-// x0 = 7005f0f5c0 (the object + 0xc0). The store is f_7000a3e9bc (the twin of 2.0.0's f_7000ac2a2c, line for line:
-// object 0x7005f0f500, ready flag +0x140, delegate +0xc0) and the step is f_7000480b9c, which ends in a tail call of
-// the delegate's call f_7000480c18 (+0x7c here: 1.0.0's step makes one call less). Both reached only through pointers.
+// 1.0.0 (main 7222E13ECF6ADB32) has the same race: #276 crashed at "host pc 0", lr 7000480c50 = f_1000480c18+0x38 with
+// x0 = 7005f0f5c0 (the object + 0xc0). The store is f_1000a3e9bc (the twin of 2.0.0's f_1000ac2a2c, line for line:
+// object 0x1005f0f500, ready flag +0x140, delegate +0xc0) and the step is f_1000480b9c, which ends in a tail call of
+// the delegate's call f_1000480c18 (+0x7c here: 1.0.0's step makes one call less). Both reached only through pointers.
 typedef struct { uint8_t id[8]; uint64_t obj, set, use, call; } BootDelegate;  // (call: the delegate's call, from use)
 static const BootDelegate boot_delegates[] = {
-    {{0x72, 0x22, 0xE1, 0x3E, 0xCF, 0x6A, 0xDB, 0x32}, 0x7005f0f500ull, 0x7000a3e9bcull, 0x7000480b9cull, 0x7c},  // 1.0.0
-    {{0x8A, 0x1C, 0x86, 0xC4, 0x37, 0x39, 0x4B, 0x69}, 0x7006109cc0ull, 0x7000ac2a2cull, 0x7000bbb0dcull, 0x98},  // 2.0.0
-    {{0xB1, 0xF1, 0x2F, 0xD9, 0x19, 0xEA, 0xE8, 0x6A}, 0x700610ecc0ull, 0x7000ac321cull, 0x7000bb9cccull, 0x98},  // 2.0.2
+    {{0x72, 0x22, 0xE1, 0x3E, 0xCF, 0x6A, 0xDB, 0x32}, 0x1005f0f500ull, 0x1000a3e9bcull, 0x1000480b9cull, 0x7c},  // 1.0.0
+    {{0x8A, 0x1C, 0x86, 0xC4, 0x37, 0x39, 0x4B, 0x69}, 0x1006109cc0ull, 0x1000ac2a2cull, 0x1000bbb0dcull, 0x98},  // 2.0.0
+    {{0xB1, 0xF1, 0x2F, 0xD9, 0x19, 0xEA, 0xE8, 0x6A}, 0x100610ecc0ull, 0x1000ac321cull, 0x1000bb9cccull, 0x98},  // 2.0.2
 };
 static const BootDelegate *g_bd;  // (this game's entry: boot_delegate_build)
 // (a step call that went on without its delegate: running it, or its delegate's call waiting for the store)
@@ -292,13 +292,13 @@ static void boot_delegate_use(Cpu *c) {
 
 // The same kind of start-up race elsewhere: a step reached only through a pointer that reads a global object without
 // checking its ready flag - when the flag is 0 the game's own code picks address 0 + field, a sure crash. #271 (2.0.2,
-// a first start with 158 s of shader preparation): f_7002c209d8+0x14c reads [0x700610db00 + 0xd0] behind the flag at
+// a first start with 158 s of shader preparation): f_1002c209d8+0x14c reads [0x100610db00 + 0xd0] behind the flag at
 // +0x100 and crashed "accessing 0xd0" right after the boot delegate's store. The step waits for the flag here (up to
 // 30 s; then it runs as before). LARECOMP_BOOT_READY_WAIT=0: no wait.
 typedef struct { uint8_t id[8]; uint64_t fn, flag; } ReadyWait;
 static const ReadyWait ready_waits[] = {
-    {{0x8A, 0x1C, 0x86, 0xC4, 0x37, 0x39, 0x4B, 0x69}, 0x7002c1e578ull, 0x7006108b00ull + 0x100},  // 2.0.0 (its twin)
-    {{0xB1, 0xF1, 0x2F, 0xD9, 0x19, 0xEA, 0xE8, 0x6A}, 0x7002c209d8ull, 0x700610db00ull + 0x100},  // 2.0.2
+    {{0x8A, 0x1C, 0x86, 0xC4, 0x37, 0x39, 0x4B, 0x69}, 0x1002c1e578ull, 0x1006108b00ull + 0x100},  // 2.0.0 (its twin)
+    {{0xB1, 0xF1, 0x2F, 0xD9, 0x19, 0xEA, 0xE8, 0x6A}, 0x1002c209d8ull, 0x100610db00ull + 0x100},  // 2.0.2
 };
 static const ReadyWait *g_rw;
 static int g_rw_known;  // (0 not looked up yet, 1 this build has one, -1 none)
@@ -575,16 +575,16 @@ bool rt_fault_watch(uint64_t fa, uint64_t pc) {
 }
 
 // #274 (2.0.2 + DLC, the first DLC mission's battle against Grisham, twice at the same point): the game crashed
-// "accessing 0xc0" in f_70009e198c, a leaf that only copies 48 bytes (three vectors) from an object's +0xc0 into
-// v0-v2. Its callers take the object from a handle (f_70002d2c78, then f_7000349b1c reads it) and some of them
-// (0x7002968c58, 0x7002971074, 0x70009df558) never check the handle (f_7000349c3c) first: an object gone at that
+// "accessing 0xc0" in f_10009e198c, a leaf that only copies 48 bytes (three vectors) from an object's +0xc0 into
+// v0-v2. Its callers take the object from a handle (f_10002d2c78, then f_1000349b1c reads it) and some of them
+// (0x1002968c58, 0x1002971074, 0x10009df558) never check the handle (f_1000349c3c) first: an object gone at that
 // moment - thread timing, which is ours and not the Switch's - is a null object. A null-page read inside one of these
 // getters (the table below, per build) gives the caller zeros instead, and the platform's handler returns to it
 // (windows.c: one frame unwound). Logged the first times. LARECOMP_NULL_GETTER=0 off.
 typedef struct { uint8_t id[8]; uint64_t fn; int nvec; } NullGetter;
 static const NullGetter null_getters[] = {
-    {{0x8A, 0x1C, 0x86, 0xC4, 0x37, 0x39, 0x4B, 0x69}, 0x70009e012cull, 3},  // 2.0.0 (the same body)
-    {{0xB1, 0xF1, 0x2F, 0xD9, 0x19, 0xEA, 0xE8, 0x6A}, 0x70009e198cull, 3},  // 2.0.2
+    {{0x8A, 0x1C, 0x86, 0xC4, 0x37, 0x39, 0x4B, 0x69}, 0x10009e012cull, 3},  // 2.0.0 (the same body)
+    {{0xB1, 0xF1, 0x2F, 0xD9, 0x19, 0xEA, 0xE8, 0x6A}, 0x10009e198cull, 3},  // 2.0.2
 };
 bool rt_null_getter_recover(uint64_t pc, uint64_t fa) {
     static int on = -1;

@@ -318,7 +318,7 @@ typedef struct {
 } Gen;
 
 static PlatProc gen_start(const Tools *t, const Gen *g, int i, const char *game_dir) {
-    static const char *const base[2] = {"0x7000000000", "0x7008000000"};
+    static const char *const base[2] = {"0x1000000000", "0x1008000000"};
     char nso[1100];
     snprintf(nso, sizeof nso, "%s" SEP "exefs" SEP "%s", game_dir, g->name);
     Args a = {0};
@@ -468,7 +468,7 @@ static void add_unit(Units *us, const char *src, const char *work, const char *s
 }
 
 // Giant functions. The generator gives a function of thousands of instructions a file of its own, and clang -O1
-// takes minutes on some of them (its optimizations grow faster than the function: Pokémon Z-A's slowest, f_7000cc0310,
+// takes minutes on some of them (its optimizations grow faster than the function: Pokémon Z-A's slowest, f_1000cc0310,
 // 10 minutes alone - 0.7 s at -O0). 166 such files were half the compile time and held the end of the build (the
 // bar standing at ~96%). Those are compiled at -O0: they run once in a while (setup, loading tables), and the game
 // doesn't notice. The few that do run every frame are listed (HOT_GIANTS, found with the sampling profiler over a
@@ -476,9 +476,9 @@ static void add_unit(Units *us, const char *src, const char *work, const char *s
 #define GIANT_INSNS 1000
 static const char *const HOT_GIANTS[] = {
     // Pokémon Z-A 2.0.0 (a recorded 7-minute play: city, Pokémon Center, menus); other builds: all at -O0, slower
-    "f_70000064b0", "f_700001ee3c", "f_7000028b70", "f_7000035f20", "f_7000048720", "f_700009f010",
-    "f_700012ee50", "f_70002182f0", "f_700021bb80", "f_7000435b10", "f_7000b11660", "f_7000da8320",
-    "f_7000e74fb0", "f_7000f15740", "f_7001810840", "f_7001835870", "f_7001b51e18",
+    "f_10000064b0", "f_100001ee3c", "f_1000028b70", "f_1000035f20", "f_1000048720", "f_100009f010",
+    "f_100012ee50", "f_10002182f0", "f_100021bb80", "f_1000435b10", "f_1000b11660", "f_1000da8320",
+    "f_1000e74fb0", "f_1000f15740", "f_1001810840", "f_1001835870", "f_1001b51e18",
 };
 
 static bool cold_giant(const char *src) {

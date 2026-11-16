@@ -23,7 +23,7 @@ from analyze import eh_frame_functions
 from lifter import Insn, Lifter, Unsupported, bits, emit_asm_batch, hx, sext
 from nso import Nso, R_AARCH64_RELATIVE
 
-SCRATCH_MEM = 0x7300000000
+SCRATCH_MEM = 0x1300000000
 
 
 def sext26(w):
@@ -338,7 +338,7 @@ class Module:
                         mu.emu_start(a2, 0, count=1)
                     a2 += 4
                 # (a load before the cmp may fault - a pointer chain through memory we don't have, Arceus's
-                # `ldr x8, [sp, #0xa0]; ldr w9, [x8, #0x220]` at 0x70017f6c78 - and is skipped: the index it
+                # `ldr x8, [sp, #0xa0]; ldr w9, [x8, #0x220]` at 0x10017f6c78 - and is skipped: the index it
                 # computes is overwritten at the cmp anyway. Unskipped, the table was left to rt_dispatch,
                 # "no function at" its first case after the player's name)
                 if not step_to(start, cmp, skip_faults=True):

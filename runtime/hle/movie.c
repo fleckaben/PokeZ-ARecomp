@@ -534,8 +534,8 @@ static void dec_start(Cpu *c) {
     c->x[0] = 0;
 }
 
-// slot 6: Stop. The game's player (0x7000912640) stops both decoders, stops its renderer threads, deletes the
-// decoders and nulls its pointers to them, and only then tells its decoder thread (0x70009114b0) to exit: an event
+// slot 6: Stop. The game's player (0x1000912640) stops both decoders, stops its renderer threads, deletes the
+// decoders and nulls its pointers to them, and only then tells its decoder thread (0x10009114b0) to exit: an event
 // of ours still set by then wakes that thread into a virtual call through the null decoder (signal 11 after the
 // title's attract movie, when the thread was slow to run). A stopped hardware decoder signals nothing, so stop
 // signalling here and clear what is still set.

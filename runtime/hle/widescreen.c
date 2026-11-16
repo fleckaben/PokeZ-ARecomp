@@ -81,7 +81,7 @@ bool widescreen_ui_pane_partial(const float *u, uint64_t size) {  // (the unifor
 static bool g_allowed = true;
 static bool g_indoor;
 // Pokémon Z-A's wider view: its cameras' projection settings (near, far, fovy, aspect, the 1920x1080 screen's bounds:
-// 0x48 bytes) are the key of a view cache, f_70018b4260(cache, ?, settings) (2.0.2) - a view is made per distinct key,
+// 0x48 bytes) are the key of a view cache, f_10018b4260(cache, ?, settings) (2.0.2) - a view is made per distinct key,
 // with the projection (and the culling frustum) from it. The screen's cameras say 16:9: their key's aspect (+0x20)
 // becomes the window's on the way in, so the view made matches the wider image. Other shapes (render-to-texture
 // cameras) are left alone. Needs game code with entry pads (built with code mods): without them the window stays
@@ -97,7 +97,7 @@ static void za_view_lookup(Cpu *c) {
 static bool za_view_tried;
 RT_ON_RESET(za_view_reset) { za_view_body = NULL; za_written = 0; za_view_tried = false; }  // (codehooks_reset: the pad)
 
-// The cache's lookup, found by its code (any game version): its key compare (2.0.2 f_70018b5c7c, these first 12
+// The cache's lookup, found by its code (any game version): its key compare (2.0.2 f_10018b5c7c, these first 12
 // instructions: ldrb w8, [x0, #0x6c]; cbz ...; then field by field), the one call to it whose function opens with
 // sub sp, sp, #0x80; stp x29, x30, [sp, #0x30] and keeps the key (mov x21, x2). Each must be the only one: 0 if
 // not, or not found (another build's code: nothing hooked, the window stays 16:9).

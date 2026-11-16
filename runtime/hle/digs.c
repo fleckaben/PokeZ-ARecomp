@@ -1,7 +1,7 @@
 // Digsanity: every diggable tile of the overworld is a check, the item comes up out of the hole, and dug holes stay.
 //
 // The Field is 16 x 16 screens of 15 x 12 units; each screen's .leb grid has 10 x 8 tiles of 1.5 units, and the
-// shovel snaps its hole to a tile centre (f_7000ddafc0). Tile ids: g = ((row - 1) * 16 + column) * 80 + tile. Tile g is
+// shovel snaps its hole to a tile centre (f_1000ddafc0). Tile ids: g = ((row - 1) * 16 + column) * 80 + tile. Tile g is
 // dug once event flag DIG_FLAG_BASE + g is set, its item picked up once GOT_FLAG_BASE + g is (the flag bitfield is
 // extended and kept in the save's sidecar: runtime/hle/flags_ext.c).
 //
@@ -11,14 +11,14 @@
 // Dig: the hook after the hole's spawn in the shovel's dig commit (runtime/hle/hooks.c DIG_HOLE_SITE) calls
 // rt_dig_hole: the first dig of a tile sets its flag. Items: a check's item is a SinkingSword item actor (type 0x194,
 // what LAS uses for standing items, pots and bushes) spawned on the dug tile through the actor factory
-// (f_70008f5ea0); touching it runs its flow entry - LAS's own item-get: Link holds it up, the game's message box,
+// (f_10008f5ea0); touching it runs its flow entry - LAS's own item-get: Link holds it up, the game's message box,
 // traps, progressive items. Its string parameters are type 5: indexes into the game's string pool (main+0x1cab2d0,
 // a vector of {std::string, refs}; the game never fills it - we install our own storage). An item actor that dies
 // with Link next to it was picked up; any other death (the Field unloading) leaves it to be spawned again.
-// Holes: the game fills in its oldest holes beyond 80 (f_7000d22d10); with digsanity the limit is HOLE_CAP
+// Holes: the game fills in its oldest holes beyond 80 (f_1000d22d10); with digsanity the limit is HOLE_CAP
 // (tools/patches.py HOLE_CAP_SITES). ObjHolesDug actors (type 0x1cd) belong to the Field's loaded scene and are gone
 // once Link leaves the Field. Every few frames the screens around Link are checked: a dug tile without a live hole
-// gets one spawned the way the shovel does (f_7000d228d0), a dug check whose item is still there gets its item back.
+// gets one spawned the way the shovel does (f_1000d228d0), a dug check whose item is still there gets its item back.
 // Tall grass and bushes would grow back over a dug tile on reload: the factory skips them there (rt_digs_skip_plant,
 // called from runtime/hle/souls.c's create-function hook). Actors are tracked by a weak reference to their shared_ptr
 // control block (libc++: shared count at +8 is -1 once the actor is gone; the block stays while we hold the weak count).

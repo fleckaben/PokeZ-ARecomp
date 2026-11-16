@@ -114,7 +114,7 @@ void pets_call(int c) {
 }
 
 // The follower actor, swapped in place (no screen change). The game spawns the companion on a level load
-// (f_700085d980: the level's allow_companions config, then COMPANION_SPAWN); Link.LeaveCompanion (event action)
+// (f_100085d980: the level's allow_companions config, then COMPANION_SPAWN); Link.LeaveCompanion (event action)
 // is COMPANION_LEAVE. The Player keeps the follower's shared_ptr at +0x1b98 / +0x1ba0.
 // GA(GAME_MGR): -> +0x4b8 Player*
 // GA(COMPANION_SPAWN): (x0 = shared_ptr out, x1 = Player): the save's companion by Link

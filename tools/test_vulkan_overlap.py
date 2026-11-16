@@ -84,7 +84,7 @@ decide_harness = r'''
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#define HEAP_BASE 0x7240000000ull
+#define HEAP_BASE 0x1240000000ull
 #define LOG(...) fprintf(stderr, __VA_ARGS__)
 static int tracking = 1;
 static int pages_cpu_written(uint64_t addr, uint64_t size, uint32_t since, uint32_t *now) {

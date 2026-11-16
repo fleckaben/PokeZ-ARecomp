@@ -1,6 +1,6 @@
 // Mini-bosses on the overworld (enemy randomizer, "Include mini-bosses"; kinds in LAS enemies.py FIELD_MINIBOSSES).
 // Armos Knight, Giant Buzz Blob and Dodongo Snakes fight on their own outside their arenas. Hinox sits in its idle
-// state until its dungeon room starts it: entering the room's camera zone (zone manager -> f_7000029520 -> actor
+// state until its dungeon room starts it: entering the room's camera zone (zone manager -> f_1000029520 -> actor
 // vfunc +0x100) hands a callback to the room's AreaEventBox, Link inside the box fires it, the actor's next state
 // requests the HinoxStart event (BGM, camera, shutters) and that event's end moves it into its fight state. The Field
 // has no zones or boxes, so here the runtime moves it into the fight state itself (no start event: no boss music or

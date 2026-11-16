@@ -35,9 +35,9 @@ static void bt_check(uint64_t a, uint64_t lr, uint64_t x0) {
     for (int i = 0; i < bt_n; i++)
         if (bt_addrs[i] == a && !atomic_exchange(&bt_done[i], 1)) {
             if (i == 0) g_bt_first_x0 = x0;
-            uint64_t vt = x0 >= 0x7000000000ull && x0 < 0x7800000000ull ? *(uint64_t *)(uintptr_t)x0 : 0;
-            uint64_t v100 = vt >= 0x7000000000ull && vt < 0x7800000000ull ? *(uint64_t *)(uintptr_t)(vt + 0x100) : 0;
-            uint64_t p8 = x0 >= 0x7000000000ull && x0 < 0x7800000000ull ? *(uint64_t *)(uintptr_t)(x0 + 8) : 0;
+            uint64_t vt = x0 >= 0x1000000000ull && x0 < 0x7800000000ull ? *(uint64_t *)(uintptr_t)x0 : 0;
+            uint64_t v100 = vt >= 0x1000000000ull && vt < 0x7800000000ull ? *(uint64_t *)(uintptr_t)(vt + 0x100) : 0;
+            uint64_t p8 = x0 >= 0x1000000000ull && x0 < 0x7800000000ull ? *(uint64_t *)(uintptr_t)(x0 + 8) : 0;
             fprintf(stderr, "[fnprof-bt] %llx entered from guest lr %llx x0 %llx (vtable %llx, +0x100 %llx, [x0+8] %llx):\n",
                     (unsigned long long)a, (unsigned long long)lr, (unsigned long long)x0, (unsigned long long)vt,
                     (unsigned long long)v100, (unsigned long long)p8);
@@ -57,7 +57,7 @@ static void bt_check(uint64_t a, uint64_t lr, uint64_t x0) {
                 const uint64_t *cp = (const uint64_t *)kernel_current_cpu();
                 uint64_t fp = cp ? cp[29] : 0;
                 fprintf(stderr, "  guest chain: %llx", (unsigned long long)lr);
-                for (int k = 0; k < 24 && fp >= 0x7000000000ull && fp < 0x7800000000ull && !(fp & 7); k++) {
+                for (int k = 0; k < 24 && fp >= 0x1000000000ull && fp < 0x7800000000ull && !(fp & 7); k++) {
                     uint64_t nfp = *(const uint64_t *)(uintptr_t)fp, ra = *(const uint64_t *)(uintptr_t)(fp + 8);
                     fprintf(stderr, " <- %llx", (unsigned long long)ra);
                     if (nfp <= fp) break;
@@ -111,9 +111,9 @@ static void mg_fn(uint64_t a, uint64_t lr) {
     if (c) fprintf(f, "  x0=%llx x1=%llx x2=%llx", (unsigned long long)c->x[0], (unsigned long long)c->x[1],
                    (unsigned long long)c->x[2]);
     uint64_t named = !c ? 0 : off == 0x2a1d3f0 ? c->x[0] : c->x[1];
-    if (msg && named >> 36 == 7) {  // the label / error name: a C string in the game's memory
+    if (msg && named >> 36 == 1) {  // the label / error name: a C string in the game's memory
         const char *label = *(const char *const *)(uintptr_t)(named + 8);
-        if ((uint64_t)(uintptr_t)label >> 36 == 7) fprintf(f, "  %s %.48s", err ? "ERROR" : "MESSAGE", label);
+        if ((uint64_t)(uintptr_t)label >> 36 == 1) fprintf(f, "  %s %.48s", err ? "ERROR" : "MESSAGE", label);
     }
     fputc('\n', f);
     if (msg || ++lines % 32 == 0) fflush(f);
@@ -146,7 +146,7 @@ void fnprof_hit(uint64_t a, uint64_t lr, uint64_t x0) {
             extern struct Cpu *kernel_current_cpu(void);
             const uint64_t *cp = (const uint64_t *)kernel_current_cpu();
             uint64_t x1 = cp ? cp[1] : 0;
-            if (x1 >= 0x7000000000ull && x1 < 0x7800000000ull) {
+            if (x1 >= 0x1000000000ull && x1 < 0x7800000000ull) {
                 extern uint64_t renderer_present_count(void);
                 fprintf(stderr, "[var] f%llu g %llx lr %llx hash %016llx val %016llx\n", (unsigned long long)renderer_present_count(),
                         (unsigned long long)x0, (unsigned long long)lr, (unsigned long long)*(uint64_t *)(uintptr_t)x1,
@@ -158,7 +158,7 @@ void fnprof_hit(uint64_t a, uint64_t lr, uint64_t x0) {
         // +0x4c at most 2) logged with its state (+0x98), time (+0x90, 30 fps frames) and caller - where a step is skipped
         static int64_t tlfn = -1;
         if (tlfn < 0) tlfn = getenv("LARECOMP_FNPROF_TL") ? (int64_t)strtoull(getenv("LARECOMP_FNPROF_TL"), NULL, 16) : 0;
-        if (tlfn && a == (uint64_t)tlfn && x0 > 0x7000000000ull && x0 < 0x7800000000ull) {
+        if (tlfn && a == (uint64_t)tlfn && x0 > 0x1000000000ull && x0 < 0x7800000000ull) {
             int32_t end = *(volatile int32_t *)(uintptr_t)(x0 + 0x4c);
             if (end >= 0 && end <= 2) {
                 extern uint64_t renderer_present_count(void);
@@ -202,7 +202,7 @@ static void dbg_scan(uint64_t frame) {
     if (at < 0 || (long)frame != at) return;
     at = -1;
     int hits = 0;
-    for (uint64_t a = 0x7000000000ull; a < 0x7800000000ull && hits < 50;) {
+    for (uint64_t a = 0x1000000000ull; a < 0x7800000000ull && hits < 50;) {
         MEMORY_BASIC_INFORMATION mi;
         if (!VirtualQuery((void *)(uintptr_t)a, &mi, sizeof mi)) break;
         uint64_t end = (uint64_t)(uintptr_t)mi.BaseAddress + mi.RegionSize;
@@ -238,13 +238,13 @@ static void slot_monitor(uint64_t frame) {  // (each frame after the scan: a slo
         static long a0 = -2, a1;
         if (a0 == -2) { a0 = -1; const char *e = getenv("LARECOMP_SLOT_DUMP"); if (e) sscanf(e, "%ld:%ld", &a0, &a1); }
         uint64_t o = slot_at[0] ? *(volatile uint64_t *)(uintptr_t)slot_at[0] : 0;
-        if (a0 >= 0 && (long)frame >= a0 && (long)frame <= a1 && o >= 0x7000000000ull && o < 0x7800000000ull) {
+        if (a0 >= 0 && (long)frame >= a0 && (long)frame <= a1 && o >= 0x1000000000ull && o < 0x7800000000ull) {
             char path[64];
             snprintf(path, sizeof path, "build/st_%llu.bin", (unsigned long long)frame);
             FILE *f = fopen(path, "wb");
             if (f) { fwrite(&o, 8, 1, f); fwrite((const void *)(uintptr_t)o, 1, 0x400, f); fclose(f); }
             uint64_t g = *(volatile uint64_t *)(uintptr_t)(o + 0x58);  // (the state's graph instance: its variables)
-            if (g >= 0x7000000000ull && g < 0x7800000000ull) {
+            if (g >= 0x1000000000ull && g < 0x7800000000ull) {
                 snprintf(path, sizeof path, "build/gr_%llu.bin", (unsigned long long)frame);
                 f = fopen(path, "wb");
                 if (f) { fwrite(&g, 8, 1, f); fwrite((const void *)(uintptr_t)g, 1, 0x1000, f); fclose(f); }
@@ -260,7 +260,7 @@ static void slot_monitor(uint64_t frame) {  // (each frame after the scan: a slo
         }
     }
 }
-static int ok_ptr(uint64_t p) { return p >= 0x7000000000ull && p < 0x7800000000ull && !(p & 7); }
+static int ok_ptr(uint64_t p) { return p >= 0x1000000000ull && p < 0x7800000000ull && !(p & 7); }
 static void slot_scan(uint64_t frame) {
     slot_monitor(frame);
     {   // LARECOMP_INTENT_MON=<frame> (#224): from that frame, the BT function's x0 is the player's state manager M; the
@@ -271,7 +271,7 @@ static void slot_scan(uint64_t frame) {
         if (im == -2) im = getenv("LARECOMP_INTENT_MON") ? atol(getenv("LARECOMP_INTENT_MON")) : -1;
         if (im >= 0 && (long)frame >= im && g_bt_first_x0 && !ent) {
             uint64_t m = g_bt_first_x0;
-            for (uint64_t a = 0x7000000000ull; a < 0x7800000000ull && !ent;) {
+            for (uint64_t a = 0x1000000000ull; a < 0x7800000000ull && !ent;) {
                 MEMORY_BASIC_INFORMATION mi;
                 if (!VirtualQuery((void *)(uintptr_t)a, &mi, sizeof mi)) break;
                 uint64_t end = (uint64_t)(uintptr_t)mi.BaseAddress + mi.RegionSize;
@@ -332,7 +332,7 @@ static void slot_scan(uint64_t frame) {
     at = -1;
     uint64_t v = g_bt_first_x0, first = 0;
     int hits = 0;
-    for (uint64_t a = 0x7000000000ull; a < 0x7800000000ull && hits < 40;) {
+    for (uint64_t a = 0x1000000000ull; a < 0x7800000000ull && hits < 40;) {
         MEMORY_BASIC_INFORMATION mi;
         if (!VirtualQuery((void *)(uintptr_t)a, &mi, sizeof mi)) break;
         uint64_t end = (uint64_t)(uintptr_t)mi.BaseAddress + mi.RegionSize;
@@ -374,7 +374,7 @@ void fnprof_frame(uint64_t frame) {
             char as[24] = "";
             bool ok = sscanf(p, "%llu:%23[^:]:%llx", &fr, as, &sz) == 3;
             ad = !strcmp(as, "bt") ? g_bt_first_x0 : strtoull(as, NULL, 16);  // (bt: the first LARECOMP_FNPROF_BT function's x0)
-            if (ok && fr == frame && ad >= 0x7000000000ull && ad + sz < 0x7800000000ull) {
+            if (ok && fr == frame && ad >= 0x1000000000ull && ad + sz < 0x7800000000ull) {
                 char path[160];
                 snprintf(path, sizeof path, "build/dump_%llu_%llx.bin", fr, ad);
                 FILE *f = fopen(path, "wb");

@@ -33,8 +33,8 @@ from analyze import eh_frame_functions  # noqa: E402
 from game_addresses import TABLE_DIR, VERSIONS, load_table, version_for_build_id  # noqa: E402
 from nso import Nso, R_AARCH64_RELATIVE  # noqa: E402
 
-MAIN_BASE = 0x7000000000
-SDK_BASE = 0x7004000000
+MAIN_BASE = 0x1000000000
+SDK_BASE = 0x1004000000
 RODATA_WINDOW = 32  # bytes on each side of a read-only data address that must match
 
 

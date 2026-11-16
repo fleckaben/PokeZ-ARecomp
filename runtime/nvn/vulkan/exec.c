@@ -9127,7 +9127,7 @@ static bool ib_overrun(CmdRec *r, const uint32_t *p, uint64_t pa) {
     uint32_t restart = st.prim_restart ? st.restart_index : 0xFFFFFFFFu, mx = 0;
     // (the first index is the block's, and a block holding other data gave one far past the guest memory window: this
     // scan read unmapped memory and the render thread crashed - #122, Iris Xe, 0x78a841c5a4 against a window ending
-    // at 0x7740000000. The GPU can't read there either: skipped)
+    // at 0x1740000000. The GPU can't read there either: skipped)
     if (ib + first * isz < gwin_base || ib + (first + count) * isz > gwin_base + gwin_max) {
         static int nlog;
         if (nlog++ < 20)
@@ -9199,7 +9199,7 @@ static bool ind_args_bad(const uint32_t *p, uint64_t pa, bool elements) {
 // streams' size) and count x instances bounded - at points already outside any pass: after each of the game's
 // dispatches (what writes the instance counts) and at each submission's start (the CPU's writes before it). A
 // rewritten block can make a draw wrong for a frame, not stop the GPU. Z-A's blocks stay at the same addresses (a few
-// hundred, 0x77394b8000 on), so a block is in place only on its first use. (A first version split the pass at each
+// hundred, 0x17394b8000 on), so a block is in place only on its first use. (A first version split the pass at each
 // such draw to fill its record just before: 500 splits a frame, 1.3 fps on the Deck.)
 // LARECOMP_VK_IND_PRIVATE=0: off (in place, as before); =1: on without the overlap too (tests). LARECOMP_VK_IND_WORK=
 // <vertices>: the count x instances bound (default 32M - the busiest Z-A frame draws a few million).
@@ -9747,8 +9747,8 @@ static void depth_blit_via_color(VkCommandBuffer cb, TexBackend *s, TexBackend *
 static void copy_texture_gpu(const TexRefRec *src, const TexRefRec *dst, uint64_t flags);
 // A copy into a pitch-linear texture (a stride: memory the CPU reads as it is) also lands in guest memory, read back
 // with the texture's own row pitch. Royale Z-A's profile photo: the frame is copied into a 1920x1080 linear RGBA8
-// texture, the CPU maps that memory, crops it to 852x444 and encodes it to BC1 itself (game fn 0x700189a880,
-// blocks by 0x700189bfb0): with the copy only in the Vulkan image the CPU read zeros - a black photo, saved black
+// texture, the CPU maps that memory, crops it to 852x444 and encodes it to BC1 itself (game fn 0x100189a880,
+// blocks by 0x100189bfb0): with the copy only in the Vulkan image the CPU read zeros - a black photo, saved black
 // (#64). Rare (one copy per photo), so the wait for the GPU is fine. LARECOMP_VK_LINEAR_WRITEBACK=0: the image only.
 static void copy_texture(const TexRefRec *src, const TexRefRec *dst, uint64_t flags) {
     copy_texture_gpu(src, dst, flags);

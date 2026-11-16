@@ -1,6 +1,6 @@
 // Game heaps (engine limits). The game carves its memory into SDK heaps of fixed sizes: nn::mem::StandardAllocator
 // (general), nn::lmem unit heaps (fixed-size blocks: object pools) and frame heaps. A heap that runs out returns
-// NULL and the game crashes further on (bushsanity: ~450 actors around Link -> null weak_ptr in f_70010d0f00).
+// NULL and the game crashes further on (bushsanity: ~450 actors around Link -> null weak_ptr in f_10010d0f00).
 // These wrappers call the SDK's own implementation (loader_find_symbol), log heap creation (LARECOMP_LOG_HEAPS=1)
 // and every allocation that fails (once per caller), and can grow heaps (heap_scale) - a recomp has memory to spare.
 #include <pthread.h>

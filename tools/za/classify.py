@@ -2,7 +2,7 @@ import re, sys, glob, struct, collections
 sys.path.insert(0, sys.argv[1])
 from nso import Nso
 import capstone
-n = Nso(sys.argv[2]); base = 0x7000000000
+n = Nso(sys.argv[2]); base = 0x1000000000
 addrs = set()
 for f in glob.glob(sys.argv[3] + '/*.c'):
     addrs.update(int(x, 16) for x in re.findall(r'rt_udf\(c, (0x[0-9a-f]+)ull\)', open(f).read()))

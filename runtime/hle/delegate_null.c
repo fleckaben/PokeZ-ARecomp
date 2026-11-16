@@ -1,5 +1,5 @@
 // Issue #19: the two forwarders of a recycled action object (main+0x10cce50 = the vtable slot +0x28 of the class
-// whose vtable is 0x7001c51358, main+0x10cce30 = its slot +0x30) do
+// whose vtable is 0x1001c51358, main+0x10cce30 = its slot +0x30) do
 //
 //     x1 = this; x0 = [this+0x10]; pc = [[x0] + 0xa0]      (0xa8 in the +0x30 one)
 //
@@ -13,7 +13,7 @@
 //
 // The hang that followed (issue #19, thread dump): skipping isn't always "nothing to do". The object is a frame job J
 // living at X+0xc8 inside its owner X (X = [J+0x28]); a per-frame kick-off (main+0x15730) rebuilds J in place under
-// X's lock - vtable 0x7001c51308, [J+0x10] = 0, then the delegate - and hangs it after the device's chain job W. W's
+// X's lock - vtable 0x1001c51308, [J+0x10] = 0, then the delegate - and hangs it after the device's chain job W. W's
 // finish releases J through slot +0x28 (the original crash's caller, main+0x13c229c). Arriving in the rebuild window,
 // the skip dropped that release: J was never queued, its Run never set X's done flag (X+0x1d8), and the main thread
 // waited on X's condition variable forever. So a live job (the derived vtable) waits, up to 1 s, until its delegate is

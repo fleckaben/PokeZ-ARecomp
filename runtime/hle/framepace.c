@@ -1,6 +1,6 @@
 // Frame pacing: the game's speed doesn't depend on the frame rate.
 // The game advances its world each frame by its frame period (16.67 ms) times the swap interval its frame timer
-// (f_700000c910) reads from the system object - normally 1. When a frame takes longer than a vsync (GPU-bound at
+// (f_100000c910) reads from the system object - normally 1. When a frame takes longer than a vsync (GPU-bound at
 // 32:9, a hitch), the next frame starts a vsync later but still advanced only 16.67 ms: slow motion (30 fps = half
 // speed). tools/patches.py FRAME_STEPS_SITE routes that read here: we return how many vsyncs really passed since
 // the last frame, so the world advances by the time that passed. The game's own waiting is unaffected (it reads
@@ -276,12 +276,12 @@ static void ch_set_install(void) {
     tried = true;
     Cpu *c = kernel_current_cpu();
     uint64_t fn = c ? c->x[8] : 0, chans = c ? c->x[0] : 0;
-    bool ok = fn >= 0x7000000000ull && fn < 0x7800000000ull && !(fn & 3) && chans >= 0x7000000000ull && chans < 0x7800000000ull;
+    bool ok = fn >= 0x1000000000ull && fn < 0x7800000000ull && !(fn & 3) && chans >= 0x1000000000ull && chans < 0x7800000000ull;
     if (ok) {
         const uint32_t *w = (const uint32_t *)(uintptr_t)fn;
         uint64_t vt = *(const uint64_t *)(uintptr_t)chans;
         ok = (w[0] & 0x9F00001Fu) == 0x90000008u && (w[1] & 0xFFC003FFu) == 0x91000108u && w[2] == 0xF862D902u &&
-             w[3] == 0xF9400008u && w[4] == 0xF9400903u && w[5] == 0xD61F0060u && vt >= 0x7000000000ull &&
+             w[3] == 0xF9400008u && w[4] == 0xF9400903u && w[5] == 0xD61F0060u && vt >= 0x1000000000ull &&
              vt < 0x7800000000ull && *(const uint64_t *)(uintptr_t)(vt + 8) == fn;
     }
     if (ok) ok = (g_ch_set_orig = dispatch_lookup(fn)) != NULL;
@@ -316,7 +316,7 @@ static uint32_t frame_step(uint32_t game_step, uint32_t channel, bool on) {
     // or two. Runs bisected on the replay: a change every frame or two (run 1) stuck, 2 / 4 / 8 never.
     // Runs still got the player stuck at a steady 37 and 32 fps (#224: a Xeon at ~37 fps; testes' trava37-1 / trava32-2,
     // recorded with LARECOMP_TEST_FPS_CAP, stuck every time). A step is only a duration: the clock's set function (the
-    // channels' vtable +8: f_70029f43d4 in 2.0.0, f_70029f4214 in 2.0.2) reads 16.7 / 33.3 / 50 / 66.7 / 83.3 ms from a
+    // channels' vtable +8: f_10029f43d4 in 2.0.0, f_10029f4214 in 2.0.2) reads 16.7 / 33.3 / 50 / 66.7 / 83.3 ms from a
     // table by the step and stores it in the channel (vtable +0x10). So (=6, the default) channel 0 gets no step at all
     // but a smooth duration: the world's time averaged (ema_step below), with what it is owed paid back gradually - the
     // world's time over any few frames, the same 16,666,667 ns a frame at 60 fps as before, ~27 ms every frame at 37 fps
@@ -472,7 +472,7 @@ uint64_t g_game_vsyncs;  // (see rt_za_frame_cfg)
 // within a limit both policies share, and the second advances it: that is what moves distant characters and Pokemon in
 // visible steps. The option lowers the rank to the limit for the duration of each policy call, so both channels update
 // every frame together, each policy keeping its own timing, accumulators and skip rules. Until #187 it forced only the
-// first channel's flag (tools/za_patches.py SMOOTH_ANIM, the byte at 0x7001dcdf60): the second stayed at the reduced
+// first channel's flag (tools/za_patches.py SMOOTH_ANIM, the byte at 0x1001dcdf60): the second stayed at the reduced
 // rate and the two disagreed - the café's blonde woman's head and an Eevee alternated between two poses every frame
 // (#187, #270; reproduced on NVIDIA too, every report on 2.0.2). Cause and approach from MonZaMac by @lucabravi
 // (lucabravi/MonZaMac#178, a Totodile's head). The four policies are found by their code (2.0.2 only); not recognised,
@@ -483,9 +483,9 @@ static void anim_policy(Cpu *c, int i) {
     uint64_t rank_p = c->x[3], limit_pp = c->x[5];
     uint32_t rank = 0;
     bool lowered = false;
-    if (g_settings.smooth_anim && rank_p >> 36 == 7 && !(rank_p & 3) && limit_pp >> 36 == 7 && !(limit_pp & 7)) {
+    if (g_settings.smooth_anim && rank_p >> 36 == 1 && !(rank_p & 3) && limit_pp >> 36 == 1 && !(limit_pp & 7)) {
         uint64_t limit_p = *(const uint64_t *)(uintptr_t)limit_pp;
-        if (limit_p >> 36 == 7 && !(limit_p & 3)) {
+        if (limit_p >> 36 == 1 && !(limit_p & 3)) {
             rank = *(const uint32_t *)(uintptr_t)rank_p;
             int32_t limit = *(const int32_t *)(uintptr_t)limit_p;
             if ((int32_t)rank > limit) {  // (the rank is a stack local of the caller, read by the policy synchronously)
@@ -527,7 +527,7 @@ static void anim_policies_install(void) {
     g_anim_policies = true;
     LOG("[anim] smooth animation: both update channels relaxed through their four policies\n");
 }
-uint8_t rt_za_smooth_anim(uint8_t flag) {  // (the first channel's flag, read at 0x7001dcdf60: tools/za_patches.py SMOOTH_ANIM)
+uint8_t rt_za_smooth_anim(uint8_t flag) {  // (the first channel's flag, read at 0x1001dcdf60: tools/za_patches.py SMOOTH_ANIM)
     anim_policies_install();
     if (g_anim_policies) return flag;  // (the policies set it themselves, for both channels)
     return g_settings.smooth_anim ? 1 : flag;

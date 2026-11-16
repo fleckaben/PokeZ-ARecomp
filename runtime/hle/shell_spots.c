@@ -416,7 +416,7 @@ static void fly_step(Spot *s) {
 // A bomb hole holding something else keeps its seashell index (with any other - or that shell owned - it is gone at
 // once and drops nothing; ItemDrop Seashell<n> drops the tagged Heart Piece), so it makes its Seashell Sensor beacon
 // (AreaShellDrop +0x2b8: the ShellBeacon component). The beacon is switched off here once the hole is up (+0x14c: 0 =
-// the sensor's check skips it, f_70008dd860), so the sensor doesn't ring for it. The level's placed actors by key:
+// the sensor's check skips it, f_10008dd860), so the sensor doesn't ring for it. The level's placed actors by key:
 // GA(ACTOR_REGISTRY) (pets.c).
 static void hole_beacons(const char *lv) {
     uint64_t map = LD64(GA(ACTOR_REGISTRY));

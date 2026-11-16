@@ -134,8 +134,8 @@ uint64_t kernel_phys_largest(uint64_t *addr) {
 }
 // Guest memory the runtime keeps for itself right after a physical memory region: the Vulkan backend's storage copies
 // (64 MB; exec.c gwin_pick: Pokémon Z-A has no heap for the ring to follow, and shaders reach a copy only inside the window
-// they address). Z-A's pool ends at 0x7740000000 and nothing of its own is ever mapped above it (2600 mappings over a
-// session on the Deck, 2026-11-01: all at 0x7400000000-0x7485000000); a physical mapping into the range is refused
+// they address). Z-A's pool ends at 0x1740000000 and nothing of its own is ever mapped above it (2600 mappings over a
+// session on the Deck, 2026-11-01: all at 0x1400000000-0x1485000000); a physical mapping into the range is refused
 // all the same (LimitReached, which the game expects when memory runs out).
 static uint64_t phys_ring_lo, phys_ring_hi;
 uint64_t kernel_phys_ring(uint64_t after, uint64_t size) {

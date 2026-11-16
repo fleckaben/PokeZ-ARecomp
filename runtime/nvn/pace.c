@@ -13,8 +13,8 @@
 
 // The game advances its world one fixed step per frame in its 60 fps mode, and two steps per frame in its 30 fps mode
 // (measured: Link walks twice as far per frame there) - so a 60-mode frame that takes 20 ms plays in slow motion, while
-// the 30 mode plays at full speed. The game picks the mode itself every frame (its frame controller f_700000c910, from
-// 0x700000ca44): the extra vsyncs it waits next become those its last frame missed, one fewer when that frame's CPU time
+// the 30 mode plays at full speed. The game picks the mode itself every frame (its frame controller f_100000c910, from
+// 0x100000ca44): the extra vsyncs it waits next become those its last frame missed, one fewer when that frame's CPU time
 // and GPU time (its timing counters) were both under its limits (13.33 / 14.17 ms), kept between a least and a most
 // (0 and 1, on the game manager). One missed vsync takes it to 30, and one quick frame - or one that came a vsync early
 // after a late one - back to 60: no hysteresis. Our frames can be slow for reasons its GPU time doesn't show (command

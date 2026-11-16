@@ -3,13 +3,13 @@ that one builds Link's Awakening's tables from its address table on import (tool
 Z-A version."""
 import struct
 
-# Frame mode: the game's frame clock (f_70019e3730) reads its configured "vsyncs per frame - 1" byte (1 on the
+# Frame mode: the game's frame clock (f_10019e3730) reads its configured "vsyncs per frame - 1" byte (1 on the
 # Switch: 30 fps) from [[x19, #0x40], #0x20]; it sets the present interval from it and hands every subsystem
 # max(that, the vsyncs that really passed) as the frame's step. Through rt_za_frame_cfg the 60 fps option makes it 0:
 # a present every vsync and a 1/60 s step - the world keeps its speed.
-ZA_BUILDS = {'7222e13ecf6adb32': 0x70019e37a8,  # 1.0.0
-             '8a1c86c437394b69': 0x7001b29cf8,  # 2.0.0 (Mega Dimension; the same function)
-             'b1f12fd919eae86a': 0x7001b296d8}  # 2.0.2
+ZA_BUILDS = {'7222e13ecf6adb32': 0x10019e37a8,  # 1.0.0
+             '8a1c86c437394b69': 0x1001b29cf8,  # 2.0.0 (Mega Dimension; the same function)
+             'b1f12fd919eae86a': 0x1001b296d8}  # 2.0.2
 
 
 def _za_frame_cfg(gen, a):
@@ -45,7 +45,7 @@ def _za_frame_dt(gen, a):
 # that offset too, unchecked (no 1.0.0 files here): the word is checked at build time and anything else keeps the plain
 # move, as FRAME_DT does. Without this hook the per-frame mode can't hold channel 0 back, and a roll left the player
 # stuck on 1.0.0 (#188, ~45 fps): runtime/hle/framepace.c keeps that mode off where the hook never runs.
-FRAME_STEP = {b: a + 0xa0 for b, a in ZA_BUILDS.items()}  # 2.0.2 0x7001b29778, 2.0.0 0x7001b29d98, 1.0.0 0x70019e3848
+FRAME_STEP = {b: a + 0xa0 for b, a in ZA_BUILDS.items()}  # 2.0.2 0x1001b29778, 2.0.0 0x1001b29d98, 1.0.0 0x10019e3848
 
 
 def _za_frame_step(gen, a):
@@ -57,11 +57,11 @@ def _za_frame_step(gen, a):
             f'  /* {a:#x}: mov w2, w20 (the channels\' step -> the decoupled one, any frame mode) */')
 
 
-# The archive reader's OodleLZ_Decompress call (`bl` in f_7001a9bd38 on 2.0.0 / f_7001a9b718 on 2.0.2, matched by
+# The archive reader's OodleLZ_Decompress call (`bl` in f_1001a9bd38 on 2.0.0 / f_1001a9b718 on 2.0.2, matched by
 # 0xa0 bytes with BL / ADRP targets masked: one hit) goes through runtime/services/fs.c rt_za_oodle_call, which decodes
 # again when it returns 0 (#173 #206: right bytes, failed decode, only on Windows 11 build 26300). 1.0.0: not located
 # (no 1.0.0 files here). The `bl`'s target is checked at build time; anything else keeps the plain call.
-OODLE_CALL = {'8a1c86c437394b69': (0x7001a9bddc, 0x7001a9d000), 'b1f12fd919eae86a': (0x7001a9b7bc, 0x7001a9c9e0)}
+OODLE_CALL = {'8a1c86c437394b69': (0x1001a9bddc, 0x1001a9d000), 'b1f12fd919eae86a': (0x1001a9b7bc, 0x1001a9c9e0)}
 
 
 def _za_oodle_call(gen, a, target):
@@ -74,14 +74,14 @@ def _za_oodle_call(gen, a, target):
             f'  /* {a:#x}: bl {target:#x} (OodleLZ_Decompress, decoded again if it fails) */')
 
 
-# Smooth distant animation: the per-frame animation update (f_7001dcdf40) reads one byte of each entity's context,
+# Smooth distant animation: the per-frame animation update (f_1001dcdf40) reads one byte of each entity's context,
 # `ldrb w8, [x8, #0x1f4]` ([x8] is [this+0x48]). Set: the entity is updated every frame. Clear: it goes through the
 # reduced path that makes distant characters and Pokemon move in visible steps (about 24 of 70 entities are set in the
 # station, chosen by distance and view). rt_za_smooth_anim (runtime/hle/framepace.c; F1 > Smooth distant animation, on
 # by default) hands the update a set byte whatever the game chose; the loaded value is what the update tests, and later
 # tests again, so the one patch covers both. Found and verified in game in MonZaMac (lucabravi/MonZaMac#150, the same
 # game on macOS/Metal). 2.0.2 only: the address and the word are checked there and nowhere else.
-SMOOTH_ANIM = {'b1f12fd919eae86a': 0x7001dcdf60}
+SMOOTH_ANIM = {'b1f12fd919eae86a': 0x1001dcdf60}
 
 
 def _za_smooth_anim(gen, a):

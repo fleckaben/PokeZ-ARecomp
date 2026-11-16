@@ -28,9 +28,9 @@ from lifter import Lifter, Unsupported
 
 print = functools.partial(print, flush=True)
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-BUF, BUF_SIZE = 0x7200000000, 0x20000
+BUF, BUF_SIZE = 0x1200000000, 0x20000
 BASE_AREA = BUF + 0x8000
-CODE, CODE_SIZE = 0x7210000000, 0x400000
+CODE, CODE_SIZE = 0x1210000000, 0x400000
 IN_FMT = '<QQ32QQQ'
 OUT_SIZE = 31 * 8 + 3 * 8 + 32 * 16
 UC_INVALID = (uc.UC_ERR_INSN_INVALID, uc.UC_ERR_EXCEPTION)

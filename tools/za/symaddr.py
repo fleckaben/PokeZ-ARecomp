@@ -1,8 +1,8 @@
-"""symaddr.py <tools dir> <exefs> addr...: nearest exported symbol per address (main @0x7000000000, sdk @0x7008000000)"""
+"""symaddr.py <tools dir> <exefs> addr...: nearest exported symbol per address (main @0x1000000000, sdk @0x1008000000)"""
 import bisect, subprocess, sys
 sys.path.insert(0, sys.argv[1])
 from nso import Nso
-mods = [('main', 0x7000000000), ('sdk', 0x7008000000)]
+mods = [('main', 0x1000000000), ('sdk', 0x1008000000)]
 tabs = {}
 for name, base in mods:
     n = Nso(f'{sys.argv[2]}/{name}')

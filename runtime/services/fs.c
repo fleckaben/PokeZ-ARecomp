@@ -320,7 +320,7 @@ static bool xbox_layer_prepare(void) {
 // They used to be swapped in by zaprompts itself as soon as they were done - while the game was playing from the old
 // DIR: it deleted the files the game was serving, which read as zeros from then on, and a model read as zeros is a
 // crash (#266: "can't open randomizer file cache/maxlod/romfs/ik_pokemon/.../pm0158_00_00.trmdl (No such file or
-// directory)", then "accessing 0" in f_7001864c30). Now a finished DIR.new is taken in here, at the start, before
+// directory)", then "accessing 0" in f_1001864c30). Now a finished DIR.new is taken in here, at the start, before
 // anything is served from DIR: the old DIR is moved aside first, so if it can't be (in use), nothing changes.
 static void cache_take_new(const char *dir) {
     char nd[300], made[320], old[300];
@@ -936,8 +936,8 @@ static void recent_read_note(uint64_t off, uint64_t size, const uint8_t *dst, ss
     recent_reads[i].hash = h, recent_reads[i].got = got;
     pthread_mutex_unlock(&recent_lock);
 }
-// The game's one OodleLZ_Decompress call for its archive reads (FileLoaderFromArchive: f_7001a9bd38 on 2.0.0,
-// f_7001a9b718 on 2.0.2 - serial, threadPhase 3, with a 512 KB decoder memory kept in the thread's TLS), through
+// The game's one OodleLZ_Decompress call for its archive reads (FileLoaderFromArchive: f_1001a9bd38 on 2.0.0,
+// f_1001a9b718 on 2.0.2 - serial, threadPhase 3, with a 512 KB decoder memory kept in the thread's TLS), through
 // tools/za_patches.py OODLE_CALL: a decode that returns 0 for data whose bytes are right is decoded again. #173 #206
 // (Windows 11 build 26300 only): the bytes read were the file's own and still intact in memory, yet the decode
 // failed while two of the game's worker threads crashed together - something else wrote into the decoder's state at

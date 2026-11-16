@@ -31,7 +31,7 @@ from game_addresses import (ADDRESS, TABLE_DIR, VERSIONS, UnknownGameVersion, ad
                             select_version, table_path, version_for_build_id)
 
 ROOT = Path(__file__).resolve().parent.parent
-MAIN_BASE = 0x7000000000
+MAIN_BASE = 0x1000000000
 parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
 parser.add_argument('--compare-generated', type=Path, nargs=2, metavar=('BEFORE', 'AFTER'))
 parser.add_argument('--game', action='append', default=[], metavar='KEY=FOLDER')
@@ -87,7 +87,7 @@ except AttributeError:
     pass
 else:
     raise AssertionError('An unknown address name was accepted')
-assert all(a < 0x7004000000 for a in list(patches.PATCHES) + list(patches.HOOKS)), 'patch sites are main addresses'
+assert all(a < 0x1004000000 for a in list(patches.PATCHES) + list(patches.HOOKS)), 'patch sites are main addresses'
 # every version: the same patches and hooks, at that version's addresses
 for key in VERSIONS:
     select_version(key)
@@ -208,10 +208,10 @@ for path in (ROOT/'runtime').rglob('*'):
     code = strip_c.sub('', path.read_text(encoding='utf-8'))
     assert not re.search(r'\bGA_(?!ADDR\b|VERSION\b|RELEASE\b|FIELD\b|AT\b)[A-Z]', code), f'{path}: use GA(NAME)'
     assert set(re.findall(r'\bGA(?:_FIELD)?\(([A-Z][A-Z0-9_]*)\)', code)) <= values.keys(), str(path)
-    # (ZA Recomp: 0x7008000000 is Pokémon Z-A's sdk base; dispatch.c holds Z-A's own boot delegate sites, one per game
+    # (ZA Recomp: 0x1008000000 is Pokémon Z-A's sdk base; dispatch.c holds Z-A's own boot delegate sites, one per game
     # build - 1.0.0 / 2.0.0 / 2.0.2 - which belong to that game, not to Link's Awakening's shared table)
     for match in re.finditer(r'0x(700[0-9a-fA-F]{7})', code):
-        assert path.name == 'dispatch.c' or int(match[1], 16) in (0x7000000000, 0x7004000000, 0x7008000000), str(path)
+        assert path.name == 'dispatch.c' or int(match[1], 16) in (0x1000000000, 0x1004000000, 0x1008000000), str(path)
     assert not re.search(r'(?:MAIN_BASE|SDK_BASE)\s*\+\s*0x[0-9a-fA-F]+', code), str(path)
 tree = ast.parse((ROOT/'tools/patches.py').read_text(encoding='utf-8'))
 used = {n.attr for n in ast.walk(tree) if isinstance(n, ast.Attribute) and isinstance(n.value, ast.Name) and n.value.id == 'A'}
@@ -221,7 +221,7 @@ docstring = tree.body[0].value
 for node in ast.walk(tree):
     if isinstance(node, ast.Constant) and node is not docstring:
         if isinstance(node.value, int):
-            assert not 0x7000000000 < node.value < 0x7100000000
+            assert not 0x1000000000 < node.value < 0x1100000000
         elif isinstance(node.value, str):
             assert not re.search(r'(?:0x|f_|L_)700[0-9a-fA-F]{7}', node.value)
 

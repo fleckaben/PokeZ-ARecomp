@@ -239,7 +239,7 @@ int main(int argc, char **argv) {
     load_patterns(argv[1]);
     long count = atol(argv[2]);
     rng_state = g_seed = strtoull(argv[3], NULL, 0);
-    maxwell_gmem_base = 0x7240000000ull;
+    maxwell_gmem_base = 0x1240000000ull;
     maxwell_gmem_size = 0xD0000000ull;
     init_device();
     vk_shaders_init();

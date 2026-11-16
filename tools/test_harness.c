@@ -9,7 +9,7 @@
 extern GuestFn tests[];
 extern int ntests;
 
-#define BUF 0x7200000000ull
+#define BUF 0x1200000000ull
 #define BUF_SIZE 0x40000
 
 void rt_dispatch(Cpu *c) { (void)c; }

@@ -28,28 +28,28 @@ static inline void __attribute__((format(printf, 1, 2))) rt_log(const char *fmt,
 // ---- address space layout (guest addresses == host addresses)
 // macOS reserves 0x2_0000_0000-0x70_0000_0000, and guest addresses must fit in 39 bits, so the
 // guest lives in a 12.5 GB window at 0x70_0000_0000 claimed at startup (see main.c).
-#define GUEST_LO     0x7000000000ull
+#define GUEST_LO     0x1000000000ull
 #ifdef __APPLE__
-#define GUEST_HI     0x7320000000ull
+#define GUEST_HI     0x1320000000ull
 #else  // room for an SDK's virtual address memory too (Pokémon Legends Z-A reserves 12 GB; MAP_NORESERVE)
 #define GUEST_HI     0x7800000000ull
 #endif
-#define MAIN_BASE    0x7000000000ull
-#define SDK_BASE     0x7008000000ull   // (128 MB for main: Pokémon Legends Z-A's image is 0x5f7a000)
-#define HLE_BASE     0x7080000000ull   // fake addresses for host-implemented functions
+#define MAIN_BASE    0x1000000000ull
+#define SDK_BASE     0x1008000000ull   // (128 MB for main: Pokémon Legends Z-A's image is 0x5f7a000)
+#define HLE_BASE     0x1080000000ull   // fake addresses for host-implemented functions
 #define HLE_SIZE     0x0000100000ull
-#define TLS_BASE     0x7090000000ull
+#define TLS_BASE     0x1090000000ull
 #define TLS_SIZE     0x0000100000ull
-#define HLE_HEAP     0x7092000000ull   // guest-visible memory owned by host code
+#define HLE_HEAP     0x1092000000ull   // guest-visible memory owned by host code
 #define HLE_HEAP_SIZE 0x000E000000ull
 #ifdef __APPLE__
-#define ALIAS_BASE   0x7100000000ull   // alias region (svcMapMemory targets)
+#define ALIAS_BASE   0x1100000000ull   // alias region (svcMapMemory targets)
 #define ALIAS_SIZE   0x0100000000ull
 #else  // alias region (svcMapMemory targets; an SDK's virtual address memory reserves its address regions here)
-#define ALIAS_BASE   0x7400000000ull
+#define ALIAS_BASE   0x1400000000ull
 #define ALIAS_SIZE   0x0400000000ull   // 16 GB, up to GUEST_HI
 #endif
-#define HEAP_BASE    0x7240000000ull
+#define HEAP_BASE    0x1240000000ull
 #define HEAP_MAX     0x00D0000000ull   // 3.25 GB
 
 // ---- the game (kernel.c; set from exefs/main.npdm by main.c)
