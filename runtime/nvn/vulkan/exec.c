@@ -6135,12 +6135,16 @@ static bool xm_on(void) {
     if (on < 0) {
         const char *e = ENV("LARECOMP_VK_XFB_MIRROR");
         int cs = g_settings.gpu_compat[GPU_XFB_MIRROR];  // (F1 > Compatibility)
-        on = e ? atoi(e) != 0 : cs != GPU_AUTO ? cs == GPU_ON : g_vk.props.vendorID != 0x1002;
+        // (Adreno: off. Its memory is the CPU's, shared through the AHardwareBuffer window - nothing to save - and the
+        // copy back to the heap after each of Z-A's ~110 sessions a frame ended the render pass: each time the whole
+        // 1440x810 target was stored and loaded again by the tiler. Off: 9900 -> 4200 passes in 2 s in the city and
+        // 12 % less GPU work on an Odin 3, characters as before)
+        on = e ? atoi(e) != 0 : cs != GPU_AUTO ? cs == GPU_ON : g_vk.props.vendorID != 0x1002 && g_vk.props.vendorID != 0x5143;
         if (!on && !e) LOG("[vk] transform feedback mirror off (%s; LARECOMP_VK_XFB_MIRROR=1: on)\n",
-                           cs == GPU_OFF ? "F1 > Compatibility" : "this AMD GPU, F1 > Compatibility to turn it on");
+                           cs == GPU_OFF ? "F1 > Compatibility" : "this GPU, F1 > Compatibility to turn it on");
     }
 #ifdef __ANDROID__
-    return on;  // (no host import on Adreno: the mirror keeps transform feedback output away from the heap copies)
+    return on;
 #else
     return on && g_vk.host_import;
 #endif
