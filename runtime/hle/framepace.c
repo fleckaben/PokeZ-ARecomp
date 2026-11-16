@@ -276,13 +276,13 @@ static void ch_set_install(void) {
     tried = true;
     Cpu *c = kernel_current_cpu();
     uint64_t fn = c ? c->x[8] : 0, chans = c ? c->x[0] : 0;
-    bool ok = fn >= 0x1000000000ull && fn < 0x7800000000ull && !(fn & 3) && chans >= 0x1000000000ull && chans < 0x7800000000ull;
+    bool ok = fn >= 0x1000000000ull && fn < 0x1800000000ull && !(fn & 3) && chans >= 0x1000000000ull && chans < 0x1800000000ull;
     if (ok) {
         const uint32_t *w = (const uint32_t *)(uintptr_t)fn;
         uint64_t vt = *(const uint64_t *)(uintptr_t)chans;
         ok = (w[0] & 0x9F00001Fu) == 0x90000008u && (w[1] & 0xFFC003FFu) == 0x91000108u && w[2] == 0xF862D902u &&
              w[3] == 0xF9400008u && w[4] == 0xF9400903u && w[5] == 0xD61F0060u && vt >= 0x1000000000ull &&
-             vt < 0x7800000000ull && *(const uint64_t *)(uintptr_t)(vt + 8) == fn;
+             vt < 0x1800000000ull && *(const uint64_t *)(uintptr_t)(vt + 8) == fn;
     }
     if (ok) ok = (g_ch_set_orig = dispatch_lookup(fn)) != NULL;
     if (!ok) {

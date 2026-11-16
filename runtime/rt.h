@@ -32,7 +32,7 @@ static inline void __attribute__((format(printf, 1, 2))) rt_log(const char *fmt,
 #ifdef __APPLE__
 #define GUEST_HI     0x1320000000ull
 #else  // room for an SDK's virtual address memory too (Pokémon Legends Z-A reserves 12 GB; MAP_NORESERVE)
-#define GUEST_HI     0x7800000000ull
+#define GUEST_HI     0x1800000000ull
 #endif
 #define MAIN_BASE    0x1000000000ull
 #define SDK_BASE     0x1008000000ull   // (128 MB for main: Pokémon Legends Z-A's image is 0x5f7a000)
