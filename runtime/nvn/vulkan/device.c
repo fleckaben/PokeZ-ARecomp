@@ -2801,7 +2801,14 @@ int ui_run(void) {
         SDL_Event e;
         atomic_store(&ui_beat, SDL_GetTicksNS());
         atomic_store(&ui_stage, "waiting for events");
+#ifdef __ANDROID__
+        // (SDL_WaitEventTimeout spins on Android - its pump polls with zero timeouts while a gamepad is open: one big
+        // core at 100 % and a hot Odin. Polled here, with a 4 ms sleep between rounds)
+        SDL_Delay(4);
+        while (SDL_PollEvent(&e)) {
+#else
         while (SDL_WaitEventTimeout(&e, 16)) {
+#endif
             input_rumble_poll();
             atomic_store(&ui_beat, SDL_GetTicksNS());
             window_event_log(&e);
