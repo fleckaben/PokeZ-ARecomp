@@ -8422,7 +8422,8 @@ static void draw_(CmdRec *r, bool indexed) {
         // (Adreno: a pipeline bind loses the dynamic state set before it - left out as unchanged, the arches' and
         // ivy's draws after another pipeline kept wrong state for a frame or many, flat and untextured with the
         // camera's angle. The pipeline's own bit stays known; everything dynamic is set again)
-        ss.known = SS_PIPE | (ss.known & (SS_IB));
+        ss.known = SS_PIPE;  // (the vertex / index buffer binds too: stretched triangles with them kept)
+        ss.vb_known = 0;
 #endif
     }
     if (g_vk.vids && ss_need(SS_VI, !memcmp(&ss.vi, &vl, sizeof vl))) { ss.vi = vl; set_vertex_input(cb, &vl); }
