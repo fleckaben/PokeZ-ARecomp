@@ -65,6 +65,9 @@ __attribute__((visibility("default"))) int SDL_main(int argc, char **argv) {
     }
     if (!getenv("LARECOMP_VK_PRESENT")) setenv("LARECOMP_VK_PRESENT", "fifo", 1);  // (mailbox: black frames on Adreno)
     keep_off_prime_cores();
+    // (the whole guest window for shaders: the 256 MB default of integrated GPUs saves a desktop driver's userptr
+    // checks, which the AHardwareBuffer window doesn't have - exec.c android_window)
+    if (!getenv("LARECOMP_VK_GMEM_WINDOW")) setenv("LARECOMP_VK_GMEM_WINDOW", "0", 1);
     // the files the desktop builds keep next to the executable, from the APK's assets
     static const char *const res[] = {"BIZUDPGothic-Regular.ttf", "DejaVuSans.ttf", "DejaVuSans-Bold.ttf",
                                       "Baloo2-SemiBold.ttf", "za-default.ini", "icon.png"};
