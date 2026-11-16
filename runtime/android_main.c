@@ -4,7 +4,10 @@
 // in /storage/emulated/0/ZARecomp/extracted. Straight into the game: no start screen (it builds game code and can
 // delete game files, neither of which an Android build can do).
 #ifdef __ANDROID__
+#define _GNU_SOURCE
 #include <SDL3/SDL.h>
+#include <dirent.h>
+#include <sched.h>
 #include <dlfcn.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -13,6 +16,26 @@
 #include <unistd.h>
 
 int main(int argc, char **argv);
+
+// The game's threads off the Snapdragon 8 Elite's two prime cores (4.32 GHz): the scheduler put the busiest ones
+// there and those cores ran at 100 °C with the fan at full speed, while the game uses about 1.2 cores in all and the
+// six 3.53 GHz cores stayed near 60 °C. Every thread of the process now, and the ones made later inherit it.
+// LARECOMP_ANDROID_CPUS=<hex mask> (0xff: all).
+static void keep_off_prime_cores(void) {
+    const char *e = getenv("LARECOMP_ANDROID_CPUS");
+    unsigned long mask = e ? strtoul(e, NULL, 16) : 0x3f;
+    long n = sysconf(_SC_NPROCESSORS_CONF);
+    if (!mask || n < 8) return;  // (not an 8-core part: as it was)
+    cpu_set_t set;
+    CPU_ZERO(&set);
+    for (int i = 0; i < 64 && i < n; i++)
+        if (mask >> i & 1) CPU_SET(i, &set);
+    DIR *d = opendir("/proc/self/task");
+    struct dirent *de;
+    while (d && (de = readdir(d)))
+        if (de->d_name[0] != '.') sched_setaffinity(atoi(de->d_name), sizeof set, &set);
+    if (d) closedir(d);
+}
 
 __attribute__((visibility("default"))) int SDL_main(int argc, char **argv) {
     (void)argc;
@@ -38,6 +61,7 @@ __attribute__((visibility("default"))) int SDL_main(int argc, char **argv) {
         if (f) fclose(f);
     }
     if (!getenv("LARECOMP_VK_PRESENT")) setenv("LARECOMP_VK_PRESENT", "fifo", 1);  // (mailbox: black frames on Adreno)
+    keep_off_prime_cores();
     // the files the desktop builds keep next to the executable, from the APK's assets
     static const char *const res[] = {"BIZUDPGothic-Regular.ttf", "DejaVuSans.ttf", "DejaVuSans-Bold.ttf",
                                       "Baloo2-SemiBold.ttf", "za-default.ini", "icon.png"};
