@@ -14,8 +14,86 @@
 #include <string.h>
 #include <sys/stat.h>
 #include <unistd.h>
+#include <math.h>
+#include <android/thermal.h>
+#include "rt.h"
+#include "settings.h"
 
 int main(int argc, char **argv);
+
+// ---- performance hints and the thermal step-down: adapted from MrSw4gGuy/PokeZ-Android (runtime/platform/android.c)
+
+// Android's ADPF (API 33, looked up at run time): a session for the presenting thread gets the frame's real budget
+// and each frame's work, so the scheduler keeps the CPU clocks that meet it instead of holding them up.
+// LARECOMP_PERF_HINT=0: off.
+typedef struct APerformanceHintManager APerformanceHintManager;
+typedef struct APerformanceHintSession APerformanceHintSession;
+void plat_perf_hint(uint64_t work_ns, uint64_t target_ns) {
+    static int state = -1;  // (-1 not tried, 0 none, 1 on)
+    static APerformanceHintSession *s;
+    static int64_t cur_target;
+    static int (*report)(APerformanceHintSession *, int64_t);
+    static int (*update)(APerformanceHintSession *, int64_t);
+    if (state < 0) {
+        state = 0;
+        const char *e = getenv("LARECOMP_PERF_HINT");
+        if (e && !atoi(e)) return;
+        void *h = dlopen("libandroid.so", RTLD_NOW);
+        APerformanceHintManager *(*get)(void) = h ? (APerformanceHintManager * (*)(void)) dlsym(h, "APerformanceHint_getManager") : NULL;
+        APerformanceHintSession *(*create)(APerformanceHintManager *, const int32_t *, size_t, int64_t) =
+            h ? (APerformanceHintSession * (*)(APerformanceHintManager *, const int32_t *, size_t, int64_t))
+                    dlsym(h, "APerformanceHint_createSession") : NULL;
+        report = h ? (int (*)(APerformanceHintSession *, int64_t))dlsym(h, "APerformanceHint_reportActualWorkDuration") : NULL;
+        update = h ? (int (*)(APerformanceHintSession *, int64_t))dlsym(h, "APerformanceHint_updateTargetWorkDuration") : NULL;
+        APerformanceHintManager *m = get ? get() : NULL;
+        int32_t tid = (int32_t)gettid();
+        s = m && create && report && update ? create(m, &tid, 1, (int64_t)target_ns) : NULL;
+        cur_target = (int64_t)target_ns;
+        state = s != NULL;
+        LOG("[perfhint] %s\n", s ? "performance hint session on" : "no performance hints here");
+    }
+    if (state != 1 || !work_ns) return;
+    if ((int64_t)target_ns != cur_target) update(s, (int64_t)target_ns), cur_target = (int64_t)target_ns;
+    report(s, (int64_t)work_ns);
+}
+
+// AThermal_getThermalHeadroom (API 31): the system's forecast of how close the device will be, over the next seconds,
+// to its severe throttling point (1.0). Steps 100 / 85 / 70 / 60 %: down at 0.80 (10 s apart), back up below 0.60
+// (30 s apart). The API wants a call a second at most. Only with the "Lower resolution when hot" setting.
+static int thermal_step;
+int plat_thermal_throttled(void) { return thermal_step > 0; }
+double plat_thermal_scale(double now) {
+    static const double steps[] = {1.0, 0.85, 0.7, 0.6};
+    static AThermalManager *mgr;
+    static int tried;
+#define step thermal_step
+    static double next_read, last_change = -1e9, last_line = -1e9;
+    if (!g_settings.thermal_res) {
+        if (step) LOG("[thermal] resolution by temperature: off\n");
+        step = 0;
+        return 1.0;
+    }
+    if (!tried) {
+        tried = 1;
+        mgr = AThermal_acquireManager();
+        LOG("[thermal] resolution by temperature: %s\n", mgr ? "on" : "no thermal manager here");
+    }
+    if (!mgr || now < next_read) return steps[step];
+    next_read = now + 1.0;
+    float h = AThermal_getThermalHeadroom(mgr, 10);
+    if (isnan(h)) return steps[step];
+    int was = step;
+    if (h >= 0.80f && step < 3 && now - last_change >= 10) step++;
+    else if (h < 0.60f && step > 0 && now - last_change >= 30) step--;
+    if (step != was) last_change = now;
+    if (step != was || now - last_line >= 30) {
+        last_line = now;
+        LOG("[thermal] headroom %.2f: render scale %.0f%%%s\n", h, steps[step] * 100,
+            step > was ? " - stepped down" : step < was ? " - stepped up" : "");
+    }
+    return steps[step];
+}
+#undef step
 
 // The game's threads off the Snapdragon 8 Elite's two prime cores (4.32 GHz): the scheduler put the busiest ones
 // there and those cores ran at 100 °C with the fan at full speed, while the game uses about 1.2 cores in all and the

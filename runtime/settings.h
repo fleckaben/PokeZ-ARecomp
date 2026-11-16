@@ -7,7 +7,8 @@
 enum { ASPECT_UNLOCKED = 0, ASPECT_ORIGINAL = 1 };
 enum { RES_MATCH = 0, /* 1..8 = 1x..8x */ RES_DYNAMIC = 9, RES_Q75 = 10, RES_Q25 = 11, RES_Q50 = 12, RES_X15 = 13 };
 // (11 was 67% of the display: larecomp.ini "67%" now loads as RES_Q75)
-enum { UPSCALE_BILINEAR = 0, UPSCALE_METALFX = 1 /* macOS */, UPSCALE_FSR1 = 2 /* Windows: AMD FSR 1 */ };
+enum { UPSCALE_BILINEAR = 0, UPSCALE_METALFX = 1 /* macOS */, UPSCALE_FSR1 = 2 /* Windows: AMD FSR 1 */,
+       UPSCALE_SGSR = 3 /* Vulkan: Snapdragon Game Super Resolution 1 (the Android default) */ };
 #ifdef __APPLE__
 #define UPSCALE_SHARP UPSCALE_METALFX  // each OS's non-bilinear upscaler (the default)
 #else
@@ -147,6 +148,8 @@ typedef struct {
                       // below 60 fps). On by default; LARECOMP_FRAME_DT=0 / 1 overrides it at load.
     bool smooth_anim; // Pokémon Z-A 2.0.2: distant characters animate every frame (runtime/hle/framepace.c
                       // rt_za_smooth_anim). On by default; LARECOMP_SMOOTH_ANIM=0 / 1 overrides it at load.
+    bool thermal_res; // Android: the internal resolution steps down while the device runs hot (runtime/android_main.c
+                      // plat_thermal_scale). Off by default
     bool full_detail; // Pokémon Z-A: every model at its full detail at any distance (cache/maxlod, made from the
                       // player's game files by zaprompts --maxlod: runtime/ui/launcher.mm launcher_maxlod_kick;
                       // layered by runtime/services/fs.c). Off by default (GPU time); from the next start. #190

@@ -168,11 +168,15 @@ void settings_resolve_defaults(bool integrated) {
     if (e && *e) integrated = atoi(e) != 0;
     g_gpu_integrated = integrated;
     g_default_upscaler = integrated ? UPSCALE_BILINEAR : UPSCALE_SHARP;
+#ifdef __ANDROID__
+    g_default_upscaler = UPSCALE_SGSR;  // (made for Adreno: one pass, sharper than bilinear for about the same cost)
+#endif
     g_default_res_mode = RES_MATCH;  // (Dynamic is not a default until it is reliable: user 2026-10-18)
     if (g_settings.upscaler_auto) g_settings.upscaler = g_default_upscaler;
     if (g_settings.res_auto) g_settings.res_mode = g_default_res_mode;
     LOG("[settings] %s GPU: upscaler %s (%s), resolution %s (%s), anti-aliasing %s\n", integrated ? "integrated" : "discrete / other",
-        g_settings.upscaler == UPSCALE_BILINEAR ? "bilinear" : g_settings.upscaler == UPSCALE_FSR1 ? "fsr1" : "metalfx",
+        g_settings.upscaler == UPSCALE_BILINEAR ? "bilinear" : g_settings.upscaler == UPSCALE_FSR1 ? "fsr1" :
+        g_settings.upscaler == UPSCALE_SGSR ? "sgsr" : "metalfx",
         g_settings.upscaler_auto ? "default" : "chosen", res_name(g_settings.res_mode), g_settings.res_auto ? "default" : "chosen",
         g_settings.antialias == AA_SMAA ? "smaa" : "off");
 }
@@ -317,6 +321,7 @@ void settings_load(void) {
         else if (!strcmp(key, "frame_dt")) g_settings.frame_dt = atoi(val) != 0;
         else if (!strcmp(key, "smooth_anim")) g_settings.smooth_anim = atoi(val) != 0;
         else if (!strcmp(key, "full_detail_models")) g_settings.full_detail = atoi(val) != 0;
+        else if (!strcmp(key, "thermal_resolution")) g_settings.thermal_res = atoi(val) != 0;
         else if (!strcmp(key, "draw_distance")) g_settings.draw_dist = atoi(val);
         else if (!strcmp(key, "hdr")) g_settings.hdr = atoi(val) != 0;
         else if (!strcmp(key, "hdr_peak_nits")) { int n = atoi(val); g_settings.hdr_peak = n < 200 ? 200 : n > 10000 ? 10000 : n; }
@@ -358,7 +363,8 @@ void settings_load(void) {
         }
         else if (!strcmp(key, "upscaler")) {  // (metalfx / fsr1: this OS's; auto: never chosen, the GPU's default)
             g_settings.upscaler_auto = !strcmp(val, "auto");
-            if (!g_settings.upscaler_auto) g_settings.upscaler = !strcmp(val, "bilinear") ? UPSCALE_BILINEAR : UPSCALE_SHARP;
+            if (!g_settings.upscaler_auto) g_settings.upscaler = !strcmp(val, "bilinear") ? UPSCALE_BILINEAR
+                                                               : !strcmp(val, "sgsr") ? UPSCALE_SGSR : UPSCALE_SHARP;
             else g_settings.upscaler = g_default_upscaler;
         }
         else if (!strcmp(key, "antialias")) g_settings.antialias = !strcmp(val, "off") ? AA_OFF : AA_SMAA;  // ("fxaa": SMAA now)
@@ -484,6 +490,7 @@ void settings_save(void) {
     fprintf(f, "frame_dt = %d\n", g_settings.frame_dt);
     fprintf(f, "smooth_anim = %d\n", g_settings.smooth_anim);
     fprintf(f, "full_detail_models = %d\n", g_settings.full_detail);
+    fprintf(f, "thermal_resolution = %d\n", g_settings.thermal_res);
     fprintf(f, "draw_distance = %d\n", g_settings.draw_dist);
     fprintf(f, "aniso16 = %d\n", g_settings.aniso16);
     fprintf(f, "hdr = %d\n", g_settings.hdr);
@@ -515,7 +522,7 @@ void settings_save(void) {
     fprintf(f, "water_vivid = %d\n", g_settings.water_vivid);
     fprintf(f, "tex_dump = %d\n", g_settings.tex_dump);
     fprintf(f, "upscaler = %s\n", g_settings.upscaler_auto ? "auto" : g_settings.upscaler == UPSCALE_METALFX ? "metalfx" :
-                                   g_settings.upscaler == UPSCALE_FSR1 ? "fsr1" : "bilinear");
+                                   g_settings.upscaler == UPSCALE_FSR1 ? "fsr1" : g_settings.upscaler == UPSCALE_SGSR ? "sgsr" : "bilinear");
     fprintf(f, "antialias = %s\n", g_settings.antialias == AA_SMAA ? "smaa" : "off");
     fprintf(f, "sharpening = %s\n", sharpen_names[g_settings.sharpen >= 0 && g_settings.sharpen < SHARPEN_N ? g_settings.sharpen : 0]);
     fprintf(f, "temporal_aa = %s\n", taa_names[g_settings.taa >= 0 && g_settings.taa < TAA_N ? g_settings.taa : TAA_GAME]);

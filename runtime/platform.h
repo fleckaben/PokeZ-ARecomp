@@ -64,6 +64,21 @@ void plat_thread_perf_core(int role);
 static inline void plat_thread_perf_core(int role) { (void)role; }
 #endif
 
+// ---- Android (runtime/android_main.c; adapted from MrSw4gGuy/PokeZ-Android). Elsewhere: nothing.
+#ifdef __ANDROID__
+// The share of the render scale the device's temperature allows, 1.0 = no limit; now: seconds. Only with the
+// "Lower resolution when hot" setting (off by default: the Odin 3 has a fan)
+double plat_thermal_scale(double now);
+int plat_thermal_throttled(void);  // (1 while that holds the resolution below 100 %: no 60 fps tries then)
+// The presenting thread's frame: what it took and what it may take (Android's performance hints: the CPU clocks the
+// scheduler keeps follow the real frame budget)
+void plat_perf_hint(uint64_t work_ns, uint64_t target_ns);
+#else
+static inline double plat_thermal_scale(double now) { (void)now; return 1.0; }
+static inline int plat_thermal_throttled(void) { return 0; }
+static inline void plat_perf_hint(uint64_t work_ns, uint64_t target_ns) { (void)work_ns, (void)target_ns; }
+#endif
+
 // ---- process
 void plat_init(void);                                // first thing in main()
 // The machine, for the log's first "[info]" line (runtime/main.c): nothing that identifies the player (no user name,

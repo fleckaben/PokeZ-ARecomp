@@ -481,6 +481,9 @@ void output_scale(double dw, double dh, bool reshape_allowed, double now, double
         else if (mode == RES_Q25) h *= 0.25;
         else if (mode == RES_Q50) h *= 0.5;
     }
+    // (Android, "Lower resolution when hot": the temperature's share, on top of any mode. The render targets are made
+    // again at each step, seconds apart at least)
+    h *= plat_thermal_scale(now);
     h = fmax(h, 0.1);  // (.25x of a small window)
     // The game sizes its render targets for the screen of the mode it was told (handheld: 1280x720, else 1920x1080), and
     // sx/sy are relative to that size. A fixed N x means N times the game's own image; only "match the display" and dynamic

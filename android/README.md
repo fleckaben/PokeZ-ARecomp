@@ -26,6 +26,18 @@ tested. Within that part:
   pots), a flashing white light on a rooftop, blotched eyes, a missing character and missing text on the Profile
   screen
 
+## Options added for Android (F1 menu)
+
+These four come from [MrSw4gGuy's Android port](https://github.com/MrSw4gGuy/PokeZ-Android), rewritten for this fork:
+
+- **Upscaler: Snapdragon GSR**: Qualcomm's upscaler made for Adreno. It's the Android default, but it only does
+  something when the internal resolution is below the screen's (75 %, for example).
+- **Dynamic 30 / 60 fps**: with 60 fps on, the game drops to 30 when 60 isn't held, then tries 60 again on a scene
+  change or after a while. On the Odin 3, one test area held 59.9 fps at 75 % resolution, with the fan at full speed.
+- **Lower resolution when hot**: **off by default**. The Odin 3 has a fan, and its system reports "hot" early: with
+  this on, the resolution fell to 60 % within a minute. Meant for phones without a fan.
+- **Android performance hints**: always on; the game tells Android how much CPU each frame needs.
+
 ## Performance (Odin 3, default settings)
 
 - **30 fps** in the city
@@ -105,6 +117,9 @@ Every Android change is behind `#ifdef __ANDROID__`, except the guest memory mov
 ## Credits
 
 - [ZA Recomp](https://github.com/Hexveil404/PokeZ-ARecomp) and its contributors: the whole recompilation and runtime
+- [MrSw4gGuy/PokeZ-Android](https://github.com/MrSw4gGuy/PokeZ-Android): the Snapdragon GSR upscaler, dynamic 30 / 60 fps,
+  the thermal resolution step-down and the performance hints (adapted here)
+- Snapdragon Game Super Resolution, Qualcomm (BSD-3-Clause, `third_party/sgsr`)
 - SDL, FFmpeg, shaderc and the other libraries it uses
 - The Android port: me, with Claude (Anthropic)
 

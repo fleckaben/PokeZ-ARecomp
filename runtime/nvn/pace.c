@@ -131,6 +131,7 @@ static float median60(const float *v) {
 
 // Any thread: a one-off stall (why: what, for the log) - the next PACE_GRACE_NS of frames don't count (see above).
 static uint64_t hitch_at;
+uint64_t pace_last_hitch_ns(void) { return __atomic_load_n(&hitch_at, __ATOMIC_ACQUIRE); }  // (0: none yet)
 static const char *hitch_why;
 void pace_hitch(const char *why) {
     __atomic_store_n(&hitch_why, why, __ATOMIC_RELAXED);
@@ -147,6 +148,12 @@ void pace_settings_changed(const char *what) {
 }
 
 bool pace_is_slow(void) { return pace_slow; }
+// (Pokémon Z-A's dynamic 30 / 60, hle/framepace.c; from MrSw4gGuy/PokeZ-Android) the CPU time per presented frame -
+// the presenting thread's or the render thread's, whichever is more - and the GPU's, moving averages over ~20 frames,
+// ms (-1: not measured yet). CPU time, not busy time: Z-A held at 30 waits for its next frame in ways this thread's
+// blocked time doesn't see.
+static double g_cpu_avg = -1, g_gpu_avg = -1;
+void pace_frame_costs(double *cpu_ms, double *gpu_ms) { *cpu_ms = g_cpu_avg, *gpu_ms = g_gpu_avg; }
 uint64_t pace_frames_over(void) {
     uint64_t n = stat_pace_over;
     stat_pace_over = 0;
@@ -243,6 +250,9 @@ void pace_frame(void) {
         return;
     }
     double busy = (p > wt ? p - wt : 0) / 1e6;
+    // (Android's performance hints: this thread's CPU time for the frame against its budget, 33.3 ms at 30 fps.
+    // CPU time, not busy time: the game's wait for its next frame counts as busy. A no-op elsewhere)
+    plat_perf_hint(tc ? tc : 1, p > 25000000ull ? 33333333ull : 16666667ull);
     // What the frame would cost at 60 fps: a frame of the game's 30 fps mode (two vsyncs or more) runs its world twice,
     // and the second step - about half this thread's CPU time then (measured: 3.0 -> 6.0 ms, 4.9 -> 9.3 ms) - is work
     // a 60 fps frame doesn't have. Without that, the 30 fps mode's frames looked 3-5 ms slower than they would be at 60
@@ -255,6 +265,10 @@ void pace_frame(void) {
     if (pace_slow && rc / 1e6 > cost && rc < 60000000ull) cost = rc / 1e6;
     avg = avg ? avg + (cost - avg) * 0.05 : cost;
     if (gpu_ms >= 0) gpu_avg = gpu_avg >= 0 ? gpu_avg + ((gpu_ms < 100 ? gpu_ms : 100) - gpu_avg) * 0.05 : gpu_ms;
+    {
+        double cpu = (tc > rc ? tc : rc) / 1e6;
+        g_cpu_avg = g_cpu_avg >= 0 ? g_cpu_avg + (cpu - g_cpu_avg) * 0.05 : cpu, g_gpu_avg = gpu_avg;
+    }
     static int log = -1;  // LARECOMP_LOG_PACE=1: each frame's period, vsync wait and busy time
     if (log < 0) log = getenv("LARECOMP_LOG_PACE") != NULL;
     extern __thread uint64_t g_rq_wait_ns;  // rqueue.c: waits for the render thread (translation), counted as busy

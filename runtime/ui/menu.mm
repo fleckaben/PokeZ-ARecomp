@@ -589,10 +589,11 @@ static void tab_display(bool in_game) {
                 g_settings.fps60 = fr == 1;
             bool fall = !g_settings.fps60_lock;
             ImGui::BeginDisabled(!g_settings.fps60);
-            if (opt_toggle(TR("Drop to 30 fps when needed", "Cair para 30 fps quando preciso"), &fall, false,
-                           TR("With 60 fps: when this PC doesn't keep 60 for a few seconds, the game goes back to 30 fps by "
-                              "itself instead of running in slow motion (choose 60 fps again to retry). Off: it stays at "
-                              "60 - smoother when the PC keeps up, slow motion whenever it doesn't.",
+            if (opt_toggle(TR("Dynamic 30 / 60 fps", "30 / 60 fps dinâmico"), &fall, false,
+                           TR("With 60 fps: when 60 isn't kept for a few seconds, the game goes back to 30 fps by itself "
+                              "instead of running in slow motion, and tries 60 again when there is room (a scene change, "
+                              "or a while at 30). Off: it stays at 60 - smoother when the device keeps up, slow motion "
+                              "whenever it doesn't.",
                               "Com 60 fps: quando este PC não segura 60 por alguns segundos, o jogo volta para 30 fps sozinho "
                               "em vez de rodar em câmera lenta (escolha 60 fps de novo para tentar outra vez). Desligado: "
                               "fica em 60 - mais fluido quando o PC acompanha, câmera lenta quando não acompanha.")))
@@ -823,6 +824,20 @@ static void tab_display(bool in_game) {
                             "Como a imagem é ampliada para a janela quando renderiza numa resolução menor. AMD FSR 1: "
                             "ampliação que respeita as bordas, com nitidez - mais nítido. Bilinear: simples e suave.");
 #endif
+#ifdef __ANDROID__
+        const char *ups3[] = {TR("Bilinear", "Bilinear"), "AMD FSR 1", "Snapdragon GSR"};
+        const char *ud3 = TR("How the image is scaled up to the screen when it renders at a lower resolution. Snapdragon GSR: "
+                             "Qualcomm's upscaler made for Adreno, sharp for little GPU time. AMD FSR 1: edge-aware upscaling "
+                             "and sharpening. Bilinear: plain and soft.",
+                             "Como a imagem é ampliada para a tela quando renderiza numa resolução menor. Snapdragon GSR: o "
+                             "upscaler da Qualcomm feito para Adreno, nítido e leve. AMD FSR 1: ampliação que respeita as "
+                             "bordas, com nitidez. Bilinear: simples e suave.");
+        int ui3 = g_settings.upscaler == UPSCALE_BILINEAR ? 0 : g_settings.upscaler == UPSCALE_SGSR ? 2 : 1;
+        int ud3def = g_default_upscaler == UPSCALE_BILINEAR ? 0 : g_default_upscaler == UPSCALE_SGSR ? 2 : 1;
+        if (g_settings.res_mode == RES_MATCH) opt_disable_next();
+        if (opt_choice("Upscaler", &ui3, ups3, 3, ud3def, ud3))
+            g_settings.upscaler = ui3 == 0 ? UPSCALE_BILINEAR : ui3 == 2 ? UPSCALE_SGSR : UPSCALE_SHARP, g_settings.upscaler_auto = false;
+#else
         int ui = g_settings.upscaler == UPSCALE_BILINEAR ? 0 : 1;
         char udm[700];
         if (g_settings.res_mode == RES_MATCH) {  // (renders at the window's size: nothing to scale up)
@@ -834,7 +849,16 @@ static void tab_display(bool in_game) {
         }
         if (opt_choice("Upscaler", &ui, ups, 2, g_default_upscaler == UPSCALE_BILINEAR ? 0 : 1, ud))
             g_settings.upscaler = ui ? UPSCALE_SHARP : UPSCALE_BILINEAR, g_settings.upscaler_auto = false;
+#endif
     }
+#ifdef __ANDROID__
+    opt_toggle(TR("Lower resolution when hot", "Resolução menor quando quente"), &g_settings.thermal_res, false,
+               TR("When the device warns it is getting hot, the internal resolution steps down (85, 70, then 60 %) and "
+                  "comes back up once it has cooled. Useful on phones without a fan. Off: the resolution never changes "
+                  "with the temperature.",
+                  "Quando o aparelho avisa que está esquentando, a resolução interna desce (85, 70, depois 60 %) e volta "
+                  "quando esfria. Útil em celulares sem ventoinha. Desligado: a resolução nunca muda com a temperatura."));
+#endif
     const char *aa[] = {TR("Off", "Desligado"), "SMAA"};
     opt_choice("Anti-aliasing", &g_settings.antialias, aa, 2, AA_OFF,
                TR("Smooths jagged edges of the game image before it is scaled to the window. SMAA: finds the edges and "
